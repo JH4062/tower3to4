@@ -165,6 +165,7 @@ void Gameinit() {
 
 }
 
+// not fully implimented
 void Turn() {
 	RandAtt();
 	if (turnNum % 2 == 0) { // if it's my turn 
@@ -207,10 +208,6 @@ void Move() {
 		}
 	}
 			
-	// need to make function which sense collision
-	else if (xIcon >= 500 && xIcon <= 600 && yIcon >= 500 && yIcon <= 600) { 
-			showMessage("heart -1");
-		}
 
 	setTimer(moveTimer, ANIMATION_TIME);
 	startTimer(moveTimer);
@@ -224,8 +221,6 @@ void RandAtt() {
 
 	srand((unsigned int)time(NULL));
 	int num = rand() % 3;
-
-	turnNum += 1;
 
 	switch (num){
 	case 0:
@@ -345,7 +340,6 @@ void ZombieAtt2(){ // pattern2 : zombie's hand appears at random X, certain Y an
 	startTimer(attTimer2);
 }
 
-// void Collision() {}
 
 void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 	if (object == zombieF) {
@@ -380,6 +374,7 @@ void timerCallback(TimerID timer) {
 		Move();
 	}
 
+	//animation of zombie attack pattern 0
 	if (repeatNum < 3 && timer == attTimer0) {
 		ZombieAtt0();
 
@@ -389,7 +384,7 @@ void timerCallback(TimerID timer) {
 		
 	}
 
-
+	//animation of zombie attack pattern 1a
 	if (timer == attTimer1a) {
 		hideObject(brain);
 		locateObject(explosion, fight3, 644, 250);
@@ -399,10 +394,12 @@ void timerCallback(TimerID timer) {
 	
 	}
 
+	//animation of zombie attack patter 1b
 	if (timer == attTimer1b) {
 		ZombieAtt1b();
 	}
 
+	////animation of zombie attack patter 2
 	if (repeatNum < 5 && timer == attTimer2) {
 		ZombieAtt2();
 	
