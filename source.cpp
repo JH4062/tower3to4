@@ -15,6 +15,7 @@ need to make
 #include <stdlib.h>
 #include <time.h>
 
+
 #define ANIMATION_TIME		0.05f
 #define ANIMATION_STEP		30 // movement speed
 
@@ -35,11 +36,16 @@ SoundID zom, explo, hand;
 int x = 750;
 int dx = 0;
 
+const int playerX_MIN = 50, playerX_MAX = 1150;
+
 // Location of icon
-int xIcon = 644;
-int yIcon = 200;
+int iconX = 644;
+int iconY = 200;
 int dxIcon = 0;
 int dyIcon = 0;
+
+const int iconX_MIN = 333, iconX_MAX = 943, iconX_SIZE = 40;
+const int iconY_MIN = 150, iconY_MAX = 320, iconY_SIZE = 70;
 
 // Location of zombie
 int xZombie[3] = { 600, 450, 750 };
@@ -58,7 +64,20 @@ int yZomhand = 500;
 // curret numbers
 int repeatNum = 0;
 int sceneNum = 3;
-int turnNum = 1;
+int turnNum = 0;
+
+// Gold
+int gold = 359;
+ObjectID goldList[3];
+int goldX[3] = { 1040, 1067, 1094 };
+int goldY = 595;
+
+//turn
+int turnCnt = 0;
+const int TURN_TIME = 20;
+const Second TURN_TICK = 0.05f;
+
+
 
 // ====================================================================================
 // Functions
@@ -77,6 +96,75 @@ void ZombieAtt2();
 // ====================================================================================
 
 
+void Turn() {
+	// Player Turn
+	if (turnNum % 2 == 0) {
+		showObject(attack);
+		showObject(item);
+		showObject(avoid);
+	}
+	// Enemy Turn
+	else if (turnNum % 2 == 1) { // if it's com turn
+		RandAtt();
+	}
+}
+
+void showGold(void) {
+	// Shows a gold.
+
+	int temp = gold;
+	if (0 <= gold and gold < 10) {
+		for (int i = 0; i <= 0; i++) {
+			int num = temp % 10;
+			temp /= 10;
+
+			char imageName[30];
+			sprintf_s(imageName, sizeof(imageName), "./Images/Numbers/%d_R.png", num);
+			setObjectImage(goldList[i], imageName);
+			showObject(goldList[i]);
+		}
+
+		for (int i = 1; i <= 2; i++) {
+			hideObject(goldList[i]);
+		}
+	}
+	else if (10 <= gold and gold < 100) {
+		for (int i = 0; i <= 1; i++) {
+			int num = temp % 10;
+			temp /= 10;
+
+			char imageName[30];
+			sprintf_s(imageName, sizeof(imageName), "./Images/Numbers/%d_R.png", num);
+			setObjectImage(goldList[1 - i], imageName);
+			showObject(goldList[1 - i]);
+		}
+
+		for (int i = 2; i <= 2; i++) {
+			hideObject(goldList[i]);
+		}
+	}
+	else if (100 <= gold and gold < 1000) {
+		for (int i = 0; i <= 2; i++) {
+			int num = temp % 10;
+			temp /= 10;
+
+			char imageName[30];
+			sprintf_s(imageName, sizeof(imageName), "./Images/Numbers/%d_R.png", num);
+			setObjectImage(goldList[2 - i], imageName);
+			showObject(goldList[2 - i]);
+		}
+	}
+	else {
+		// Not implemented when gold >= 1000.
+		printf("showGold: Gold is over 999 \n");
+
+		for (int i = 0; i < 3; i++) {
+			setObjectImage(goldList[i], "./Images/Numbers/0_R.png");
+			showObject(goldList[i]);
+		}
+	}
+}
+
 
 void Gameinit() {
 
@@ -88,6 +176,8 @@ void Gameinit() {
 	// Timer for animation
 	moveTimer = createTimer(ANIMATION_TIME);
 	startTimer(moveTimer);
+
+	turnTimer = createTimer(ANIMATION_TIME);
 
 	attTimer0 = createTimer();
 	attTimer1a = createTimer(1.0f);
@@ -116,18 +206,10 @@ void Gameinit() {
 	showObject(warriorR);
 	scaleObject(warriorR, 0.5f);
 
-	warriorL = createObject("./Images/Characters/warrior_L.png");
-	locateObject(warriorL, towerInside3, 350, 180);
-	scaleObject(warriorL, 0.5f);
-
 	// icon
 	icon = createObject("./Images/Characters/Warrior_I.png");
-	locateObject(icon, fight3, xIcon, yIcon);
+	locateObject(icon, fight3, iconX, iconY);
 	showObject(icon);
-
-	// enemyHP
-
-	// myHP
 
 	// attack
 	attack = createObject("./Images/UI/Battle/attack.png");
@@ -163,23 +245,29 @@ void Gameinit() {
 	// zomebi's hand
 	zomhand = createObject("./Images/Enemies/tower3/zomhand.png");
 
+	// show gold
+	showGold();
 }
 
-// not fully implimented
-void Turn() {
-	RandAtt();
-	if (turnNum % 2 == 0) { // if it's my turn 
-		showObject(attack);
-		showObject(item);
-		showObject(avoid);
-	}
 
-	if (turnNum % 2 == 1) { // if it's com turn
-		
-		hideObject(attack);
-		hideObject(item);
-		hideObject(avoid);
-	}
+bool checkCollision(int xStart, int xEnd, int yStart, int yEnd) {
+	// Check a collsion, then return a result.
+
+	// About Collision:
+	// We can find 'collision' with position and size.
+	// If enemy attack's X is about 400 ~ 600,
+	// then X_MIN <= player's X <= 360 (360 can be replaced with 400 - SIZE) or 600 <= player's X <= X_MAX
+	// If enemy attack's Y is about 230 ~ 300,
+	// then Y_MIN <= player's Y <= 160 (160 can be replaced with 230 - SIZE) or 300 <= player's Y <= Y_MAX
+
+	// Conclusion:
+	// If a <= attack's range <= b, then player will be hit when (a - SIZE) < player's position < b
+
+	bool xCollision = ((xStart - iconX_SIZE) < iconX) and (iconX < xEnd);
+	bool yCollision = ((yStart - iconY_SIZE) < iconY) and (iconY < yEnd);
+
+	return xCollision and yCollision;
+
 
 }
 
@@ -187,24 +275,51 @@ void Move() {
 
 	// Movement of warrior
 	if (sceneNum == 3) {
+
 		x += dx;
-		locateObject(warriorL, towerInside3, x, 180);
+	
+		
+		if (dx < 0) {
+			setObjectImage(warriorR, "./Images/Characters/Warrior_L.png");
+		}
+		else if (dx > 0) {
+			setObjectImage(warriorR, "./Images/Characters/Warrior_R.png");
+		}
+
+		if (x < playerX_MIN) {
+			x = playerX_MIN;
+		}
+		else if (x > playerX_MAX) {
+			x = playerX_MAX;
+		}
+
 		locateObject(warriorR, towerInside3, x, 180);
+
+
+
+
 	}
 	
 	// Movement of icon
 	else if (sceneNum == 4) {
 
-		// enable icon to move in the range of gray rectangle
-		if (xIcon >= 340 && xIcon <= 940 && yIcon >= 150 && yIcon <= 320) {
-			xIcon += dxIcon;
-			yIcon += dyIcon;
-			locateObject(icon, fight3, xIcon, yIcon);
-						 
-			if (xIcon <= 340) { xIcon = 340; }
-			if (xIcon >= 940) { xIcon = 940; }
-			if (yIcon <= 150) { yIcon = 150; }
-			if (yIcon >= 320) { yIcon = 320; }
+		locateObject(icon, fight3, iconX, iconY);
+
+		// Set a restriction.
+		iconX += dxIcon;
+		if (iconX < iconX_MIN) {
+			iconX = iconX_MIN;
+		}
+		else if (iconX > iconX_MAX) {
+			iconX = iconX_MAX;
+		}
+
+		iconY += dyIcon;
+		if (iconY < iconY_MIN) {
+			iconY = iconY_MIN;
+		}
+		else if (iconY > iconY_MAX) {
+			iconY = iconY_MAX;
 		}
 	}
 			
@@ -222,7 +337,7 @@ void RandAtt() {
 	srand((unsigned int)time(NULL));
 	int num = rand() % 3;
 
-	switch (num){
+	switch (num) {
 	case 0:
 		ZombieAtt0();
 		startTimer(attTimer0);
@@ -238,8 +353,12 @@ void RandAtt() {
 		break;
 	}
 
-
+	turnNum += 1;
+	turnCnt = TURN_TIME * 3;
+	setTimer(turnTimer, TURN_TICK);
+	startTimer(turnTimer);
 }
+
 
 // pattern0 : zombie itself goes down
 void ZombieAtt0() {	
@@ -258,6 +377,10 @@ void ZombieAtt0() {
 			yZombie = 900;
 			repeatNum++;
 		}		
+	}
+
+	if (checkCollision(xZombie[repeatNum], (xZombie[repeatNum] + 200), yZombie, yZombie + 354) == true) {
+		showMessage("be collided!"); 
 	}
 }
 
@@ -296,6 +419,22 @@ void ZombieAtt1b() {
 		setTimer(attTimer1b, ANIMATION_TIME);
 		startTimer(attTimer1b);
 
+		if (checkCollision(xBlood1, xBlood1 + 30, 250, 250 + 30) == true) {
+			showMessage("be collided!");
+		}
+
+		else if (checkCollision(xBlood2, xBlood2 + 30, 250, 250 + 30) == true) {
+			showMessage("be collided!");
+		}
+
+		else if (checkCollision(644, 644 + 30, yBlood1, yBlood1 + 30) == true) {
+			showMessage("be collided!");
+		}
+
+		else if (checkCollision(644, 644 + 30, yBlood2, yBlood2 + 30) == true) {
+			showMessage("be collided!");
+		}
+
 		// if blood cells go outside of rectangle, it disappears 
 		if (xBlood1 <= 340 && xBlood2 >= 940 && yBlood1 <= 150 && yBlood2 >= 320) {
 
@@ -317,10 +456,8 @@ void ZombieAtt1b() {
 		
 		}
 
-	
 	}	
 		
-	
 }
 
 void ZombieAtt2(){ // pattern2 : zombie's hand appears at random X, certain Y and goes down. repeats for five times.
@@ -338,6 +475,10 @@ void ZombieAtt2(){ // pattern2 : zombie's hand appears at random X, certain Y an
 
 	setTimer(attTimer2, ANIMATION_TIME);
 	startTimer(attTimer2);
+
+	if (checkCollision(xZomhand[repeatNum], (xZomhand[repeatNum] + 50), yZomhand, yZombie + 70) == true) {
+		showMessage("be collided!");
+	}
 }
 
 
@@ -348,30 +489,60 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 
 	// If player clicked attack, then player attacks zombie as much as weapon's level
 	if (object == attack) {
-		showMessage("monster hurted");
-		
+		printf("MouseCallback: monster hurted \n");
+
+		hideObject(attack);
+		hideObject(item);
+		hideObject(avoid);
+
 		turnNum += 1;
-	
+		turnCnt = TURN_TIME;
+		setTimer(turnTimer, TURN_TICK);
+		startTimer(turnTimer);
 	}
 
 	if (object == item) {
 
-		
+
 	}
 
 	// If player clicked avoid, then player goes back to towerInside3
 	if (object == avoid) {
 		enterScene(towerInside3);
 		sceneNum = 3;
-		turnNum = 1;
+
+		turnCnt = 0;
+		turnNum = 0;
 	}
-}	
+}
+
+
 
 void timerCallback(TimerID timer) {
 
 	if (timer == moveTimer) {
 		//animation of movement
 		Move();
+	}
+
+	if (timer == turnTimer) {
+		// Making a turn
+		if (turnCnt > 0) {
+			turnCnt -= 1;
+
+			setTimer(turnTimer, TURN_TICK);
+			startTimer(turnTimer);
+		}
+		else {
+			if (turnNum % 2 == 0) {
+				printf("TimerCallback: Turn() - Player \n");
+			}
+			else if (turnNum % 2 == 1) {
+				printf("TimerCallback: Turn() - Enemy \n");
+			}
+
+			Turn();
+		}
 	}
 
 	//animation of zombie attack pattern 0
@@ -381,7 +552,7 @@ void timerCallback(TimerID timer) {
 		if (repeatNum == 3) {
 			locateObject(zombieF, fight3, 600, 480);
 		}
-		
+
 	}
 
 	//animation of zombie attack pattern 1a
@@ -391,7 +562,7 @@ void timerCallback(TimerID timer) {
 		showObject(explosion);
 		playSound(explo);
 		startTimer(attTimer1b);
-	
+
 	}
 
 	//animation of zombie attack patter 1b
@@ -402,7 +573,7 @@ void timerCallback(TimerID timer) {
 	////animation of zombie attack patter 2
 	if (repeatNum < 5 && timer == attTimer2) {
 		ZombieAtt2();
-	
+
 	}
 }
 
@@ -411,15 +582,13 @@ void keyboardCallback(KeyCode code, KeyState state) {
 	// If player pressed an Up arrow at structures, then player go there. (Not Implemented) 
 
 	if (code == 83) {				// RIGHT
-		showObject(warriorR);
-		hideObject(warriorL);
+
 		dx += (state == KeyState::KEYBOARD_PRESSED ? ANIMATION_STEP : -ANIMATION_STEP);
 		dxIcon += (state == KeyState::KEYBOARD_PRESSED ? ANIMATION_STEP : -ANIMATION_STEP);
 	}
 
 	else if (code == 82) {			//LEFT
-		showObject(warriorL);
-		hideObject(warriorR);
+
 		dx -= (state == KeyState::KEYBOARD_PRESSED ? ANIMATION_STEP : -ANIMATION_STEP);
 		dxIcon -= (state == KeyState::KEYBOARD_PRESSED ? ANIMATION_STEP : -ANIMATION_STEP);
 
