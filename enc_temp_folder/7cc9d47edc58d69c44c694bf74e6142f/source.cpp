@@ -1,16 +1,3 @@
-/* how to play minigame
-
-play for 30 sec 
-after 30sec, if your heart remains, you win!
-
-when player press space bar, flying warrior thorws spear to right side
-
-if you thorws spear to angel, your heart disappears.
-your heart also disappears unless you throws spear to frog until it dispaears. 
-
-*/
-
-
 
 // Preprocessor
 #include <bangtal.h>
