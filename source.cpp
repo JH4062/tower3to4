@@ -1,13 +1,3 @@
-/* how to play minigame
-
-kill frogs as much as frogKill_MAX
-
-when player press space bar, flying warrior thorws spear to right side
-
-if you thorws spear to angel, your heart disappears.
-your heart also disappears unless you throws spear to frog until it dispaears. 
-
-*/
 
 // Preprocessor
 #include <bangtal.h>
@@ -20,14 +10,12 @@ TimerID moveTimer;
 const Second MOVE_TICK = 0.05f;
 const int MOVE_SPEED = 20;
 
-
 // Scenes and Objects.
 SceneID towerInside3, fight3, towerInside4, minigame4;
 ObjectID zombieT;
 ObjectID attack, item, avoid, zombieF, brain, explosion, blood[4], zomhand;
 
 SceneID currentScene;
-
 
 //Timer for animation in tower3
 TimerID attTimer0, attTimer1a, attTimer1b, attTimer2;
@@ -75,7 +63,7 @@ int repeatNum = 0;
 int turnNum = 0;
 
 // Gold
-int gold = 359;
+int gold = 10;
 ObjectID goldList[3];
 int goldX[3] = { 1040, 1067, 1094 };
 int goldY = 595;
@@ -107,12 +95,12 @@ int enemyHp, enemyMaxHp, enemyAtk, enemyDef;
 const int enemyY_FIXED = 410;
 const int enemyHpBarX_FIXED = 333, enemyHpBarY_FIXED = 660;
 
-// minigame4
+// minigame4 ========================================================
 
 SoundID throwSpearSound;
 
 ObjectID frogT, playerWing;
-bool frogTShown = true;
+bool enemyShown = true;
 
 int playerWingX = 100, playerWingY = 300;
 int playerWingDx = 0, playerWingDy = 0;
@@ -130,7 +118,7 @@ const int frogY[3] = {100, 300, 500};
 int frogX = 1300;
 int frogY2 = 600;
 int frogRand = 0;
-bool down = true;
+bool frogDown = true;
 int frogKill = 0;
 const int frogKill_MAX = 10; // the number of frog that player has to kill
 
@@ -139,30 +127,60 @@ int spearY = playerWingY + 50;
 const int spearX_SIZE = 160, spearY_SIZE = 30;
 bool spearShown = false;
 
+// casino =========================================================================
+
+const int APPLE = 0;
+const int GRAPE = 1;
+const int ORANGE = 2;
+
+const Second  ROULETTE_TICK = 0.05f; // time gap of question mark appears
+
+ObjectID fruitA[3], fruitB[3], fruitC[3];
+int slotNumA, slotNumB, slotNumC;
+
+SceneID casinoScene;
+ObjectID questionMark, machine;
+
+TimerID casinoTimer;
+
+SoundID casinoBgm, coin, win;
+
+int spinTime = 0;
+bool isSpin = false; // is it spin?
+
+int slotX[3] = { 430, 580, 730 }; // the x of casino slot A, B, C
+
+
 // ====================================================================================
 // Functions
-
 void mouseCallback(ObjectID obj, int x, int y, MouseAction action);
 void timerCallback(TimerID timer);
 void keyboardCallback(KeyCode code, KeyState state);
-
 void gameInit();
-
 void playerMove();
 void playerIconMove();
 void playerWingMove();
-
 void Turn();
-
+// casino
+int slotA();
+int slotB();
+int slotC();
+void spin();
+void roulette();
+// fight3
 void randAtt();
 void zombieAtt0();
 void zombieAtt1a();
 void zombieAtt1b();
 void zombieAtt2();
+// minigame4
+void miniCheckHP();
+void frogFly0();
+void frogFly1();
+void frogFly2();
+void throwSpear();
 
-
-// ====================================================================================
-
+// ==================================================================================================================================================================
 
 void Turn() {
 	// Player Turn
@@ -233,6 +251,7 @@ void showGold(void) {
 	}
 }
 
+//Setting elements needed to play game
 void gameInit() {
 
 	// Scenes
@@ -240,9 +259,6 @@ void gameInit() {
 	fight3 = createScene("zombie", "./Images/Backgrounds/Battle.png");
 	towerInside4 = createScene("towerLevel4", "./Images/Backgrounds/Tower_Inside.png");
 	minigame4 = createScene("minigame4", "./Images/Backgrounds/mini3Background.jpg");
-
-	
-
 
 	// ====================================================================
 
@@ -352,6 +368,38 @@ void gameInit() {
 	// zomebi's hand
 	zomhand = createObject("./Images/Enemies/tower3/zomhand.png");
 
+	// casion ===================================================================================
+
+	casinoScene = createScene("casino", "./Images/Backgrounds/Casino_Inside.png");
+	machine = createObject("./Images/Items/Casino/machine.png");
+	locateObject(machine, casinoScene, 260, 25);
+	scaleObject(machine, 2.5f);
+	showObject(machine);
+
+	char fruitImage[100];
+	for (int i = 0; i < 3; i++) {
+		sprintf_s(fruitImage, "./Images/Items/Casino/fruitA%d.png", i);
+		sprintf_s(fruitImage, "./Images/Items/Casino/fruitB%d.png", i);
+		sprintf_s(fruitImage, "./Images/Items/Casino/fruitC%d.png", i);
+		fruitA[i] = createObject(fruitImage);
+		fruitB[i] = createObject(fruitImage);
+		fruitC[i] = createObject(fruitImage);
+	}
+
+	casinoBgm = createSound("./Audios/casino/casinoBackground.wav");
+
+	//playSound(bgm);  NEED TO REVISION :: when player enters casion, play this bgm
+
+	coin = createSound("./Audios/casino/coinEffect.wav"); 
+
+	questionMark = createObject("./Images/Items/Casino/questionMark.png"); 
+
+	win = createSound("./Audios/casino/win.mp3"); // sound effect when the three images of fruit equal 
+
+	casinoTimer = createTimer();
+
+	// =====================================================================================================
+
 	// show gold
 
 	goldList[0] = createObject("./Images/Numbers/0_R.png");
@@ -360,12 +408,13 @@ void gameInit() {
 
 	for (int i = 0; i < 3; i++) {
 		scaleObject(goldList[i], 0.8f);
-		locateObject(goldList[i], fight3, goldX[i], goldY);
+		locateObject(goldList[i], casinoScene, goldX[i], goldY);  // NEED TO REIVSE
 	}
 
 	showGold();
 
-	// minigame 4
+
+	// minigame 4 ============================================================================
 
 	throwSpearSound = createSound("./Audios/tower4/throwSpear.wav");
 
@@ -575,6 +624,110 @@ void checkHp(int kind) {
 		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_0%.png");
 	}
 }
+
+// ===========================================================================================================
+
+// make random number for slot A
+int slotA() {  
+	slotNumA = rand() % 3;
+	return slotNumA;
+}
+
+//make random number for slot B
+int slotB() { 
+	slotNumB = rand() % 3;
+	return slotNumB;
+}
+
+//make random number for slot C
+int slotC() { 
+	slotNumC = rand() % 3;
+	return slotNumC;
+}
+
+// question mark appears every slot in turn.
+void spin() { // the question mark appears 
+
+	isSpin = true; // it's spinning
+
+	for (int i = 0; i < 3; i++) { // reset every slot
+		hideObject(fruitA[i]);
+		hideObject(fruitB[i]);
+		hideObject(fruitC[i]);
+	}
+
+	spinTime += 30;
+
+	//animation for spinning
+	if (spinTime < 100) {
+		hideObject(questionMark);
+		showObject(questionMark);
+		locateObject(questionMark, casinoScene, slotX[0], 300);
+		setTimer(casinoTimer, ROULETTE_TICK);
+		startTimer(casinoTimer);
+
+
+	}
+	else if (spinTime > 100 && spinTime < 200) {
+		hideObject(questionMark);
+		locateObject(questionMark, casinoScene, slotX[1], 300);
+		showObject(questionMark);
+		setTimer(casinoTimer, ROULETTE_TICK);
+		startTimer(casinoTimer);
+	}
+
+	else if (spinTime > 200 && spinTime <= 300) {
+		hideObject(questionMark);
+		locateObject(questionMark, casinoScene, slotX[2], 300);
+		showObject(questionMark);
+		setTimer(casinoTimer, ROULETTE_TICK);
+		startTimer(casinoTimer);
+	}
+
+	else {
+		hideObject(questionMark);
+		roulette(); // after question mark appears slotC, random fruits appear at the screen
+	}
+}
+
+// fruits appear every slot
+void roulette() {
+
+	isSpin = false; // spin stopped
+
+	locateObject(fruitA[slotA()], casinoScene, slotX[0], 310); 
+	showObject(fruitA[slotNumA]);
+
+	locateObject(fruitB[slotB()], casinoScene, slotX[1], 310); 
+	showObject(fruitB[slotNumB]);
+
+	locateObject(fruitC[slotC()], casinoScene, slotX[2], 310); 
+	showObject(fruitC[slotNumC]);
+
+	if (slotNumA == slotNumB && slotNumB == slotNumC && slotNumC == APPLE) {
+		gold += 5;
+		showGold();
+
+		playSound(win);
+	}
+
+	else if (slotNumA == slotNumB && slotNumB == slotNumC && slotNumC == GRAPE) {
+		gold += 8;
+		showGold();
+
+		playSound(win);
+	}	
+
+	else if (slotNumA == slotNumB && slotNumB == slotNumC && slotNumC == ORANGE) {
+		gold += 10;
+		showGold();
+
+		playSound(win);
+	}
+
+}
+
+// ===========================================================================================================
 // Random Pattern
 void randAtt() {
 
@@ -762,7 +915,6 @@ void zombieAtt2() {
 	startTimer(attTimer2);
 
 	if (checkCollision(playerIcon, zomhandX[repeatNum], (zomhandX[repeatNum] + 50), zomhandY, zomhandY + 70) == true) {
-		showMessage("be collided!");
 
 		hitAlready = true;
 		immuneCnt = IMMUNE_TIME;
@@ -776,6 +928,7 @@ void zombieAtt2() {
 
 // ========================================================================================================
 
+// in minigame, check my heart 
 void miniCheckHP() {
 
 	miniHP--;
@@ -871,7 +1024,7 @@ void frogFly1() {
 	}
 }
 
-// frog flies slow, but fluctuate
+// frog flies slow, but it fluctuates
 void frogFly2() { 
 
 	if (frogX < 0) {
@@ -888,7 +1041,7 @@ void frogFly2() {
 
 	else {
 
-		if (down == true) {
+		if (frogDown == true) {
 
 			frogX -= 20;
 			frogY2 -= 30;
@@ -907,12 +1060,12 @@ void frogFly2() {
 
 
 			else if (frogY2 <= 100) {
-				down = false;
+				frogDown = false;
 			}
 
 		}
 
-		else if (down == false) {
+		else if (frogDown == false) {
 
 			frogX -= 20;
 			frogY2 += 30;
@@ -932,7 +1085,7 @@ void frogFly2() {
 		
 
 			else if (frogY2 >= 500) {
-				down = true;
+				frogDown = true;
 			}
 
 		}
@@ -1013,6 +1166,10 @@ void timerCallback(TimerID timer) {
 				playerWingMove();
 			}
 		}
+	}
+
+	if (timer == casinoTimer) {
+		spin();
 	}
 
 	if (timer == turnTimer) {
@@ -1114,7 +1271,7 @@ void timerCallback(TimerID timer) {
 		else { // if player kills frog as much as frogKill_MAX, player can go next floor
 
 			hideObject(frogT);
-			frogTShown = false;
+			enemyShown = false;
 
 			currentScene = towerInside4;
 			enterScene(towerInside4);
@@ -1186,8 +1343,6 @@ void keyboardCallback(KeyCode code, KeyState state) {
 
 	else if (code == 84) {			// UP
 
-		
-
 		if (currentScene == towerInside3 && playerX >= 750) { 
 			currentScene = fight3;
 			enterScene(fight3);
@@ -1199,7 +1354,7 @@ void keyboardCallback(KeyCode code, KeyState state) {
 
 		}
 
-		if (frogTShown == true && currentScene == towerInside4 && playerX >= 750) {
+		if (enemyShown == true && currentScene == towerInside4 && playerX >= 750) {
 			
 			// in case player tries minigame again
 			frogKill = 0;
@@ -1237,6 +1392,17 @@ void keyboardCallback(KeyCode code, KeyState state) {
 
 	else if (code == 75) {		// SPACEBAR
 		
+		if (currentScene == casinoScene && isSpin == false && gold > 0 && state == KeyState::KEYBOARD_PRESSED) {
+
+			gold -= 1;
+			showGold();
+
+			spinTime = 0;
+			spin();
+			playSound(coin);
+
+		}
+
 		if (currentScene == minigame4 && spearShown == false && state == KeyState::KEYBOARD_PRESSED ) {
 			playSound(throwSpearSound);
 			spearX = playerWingX;
@@ -1250,17 +1416,16 @@ void keyboardCallback(KeyCode code, KeyState state) {
 
 int main() {
 
+	srand((unsigned int)time(NULL));
+
 	setMouseCallback(mouseCallback);
 	setTimerCallback(timerCallback);
 	setKeyboardCallback(keyboardCallback);
 
-	//Setting elements needed to play game
 	gameInit();
-
 	
 	// Starting a game
-
-	currentScene = towerInside3; //revision! 
-	startGame(towerInside3);
+	currentScene = casinoScene; //revision! 
+	startGame(casinoScene);
 
 }
