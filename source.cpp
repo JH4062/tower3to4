@@ -17,7 +17,7 @@ your heart also disappears unless you throws spear to frog until it dispaears.
 
 // Animation for character's movement
 TimerID moveTimer;
-const Second MOVE_TICK = 0.01f;
+const Second MOVE_TICK = 0.05f;
 const int MOVE_SPEED = 20;
 
 
@@ -31,7 +31,7 @@ SceneID currentScene;
 
 //Timer for animation in tower3
 TimerID attTimer0, attTimer1a, attTimer1b, attTimer2;
-const Second ATT_TICK = 0.01f;
+const Second ATT_TICK = 0.05f;
 
 //Timer for animation in tower4
 TimerID frogSpawnTimer, frogFlyTimer0, frogFlyTimer1, frogFlyTimer2, spearTimer;;
@@ -544,40 +544,37 @@ void playerWingMove(void) {
 void checkHp(int kind) {
 	// Check object's Hp and change Hp bar with their Hp percent.
 
-	ObjectID hpBar;
-
 	float hpPercent;
-
+	ObjectID hpBar;
 	if (kind == PLAYER) {
 		hpPercent = static_cast<float>(playerHp) / static_cast<float>(playerMaxHp);
 		hpBar = playerHpBar;
-
 	}
 	else if (kind == ENEMY) {
 		hpPercent = static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp);
-		hpBar = enemyHpBar;	if (0.75f < hpPercent <= 1.0f) {
-		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_100%");
+		hpBar = enemyHpBar;
 	}
-	else if (0.5f < hpPercent <= 0.75f) {
-		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_75%");
+
+	if (0.75f < hpPercent and hpPercent <= 1.0f) {
+		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_100%.png");
 	}
-	else if (0.25f < hpPercent <= 0.5f) {
-		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_50%");
+	else if (0.5f < hpPercent and hpPercent <= 0.75f) {
+		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_75%.png");
 	}
-	else if (0.1f < hpPercent <= 0.25f) {
-		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_25%");
+	else if (0.25f < hpPercent and hpPercent <= 0.5f) {
+		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_50%.png");
 	}
-	else if (0.0f < hpPercent <= 0.1f) {
-		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_10%");
+	else if (0.1f < hpPercent and hpPercent <= 0.25f) {
+		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_25%.png");
+	}
+	else if (0.0f < hpPercent and hpPercent <= 0.1f) {
+		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_10%.png");
 	}
 	else {
-		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_0%");
+		// HP is 0, so we have to do something at here.
+		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_0%.png");
 	}
-	}
-
-
 }
-
 // Random Pattern
 void randAtt() {
 
@@ -628,16 +625,16 @@ void zombieAtt0() {
 	}
 
 	if (checkCollision(playerIcon, zombieX[repeatNum], (zombieX[repeatNum] + 200), zombieY, zombieY + 354) and not hitAlready) {
-		printf("ZombieAtt0: be collided! \n");
-	
+				
 		
-		playerHp -= 20; // NEED TO REVISE
-		checkHp(player);
 
 		hitAlready = true;
 		immuneCnt = IMMUNE_TIME;
 		setTimer(immuneTimer, IMMUNE_TICK);
 		startTimer(immuneTimer);
+
+		playerHp -= 20; // NEED TO REVISE
+		checkHp(PLAYER);
 	}
 }
 
@@ -677,39 +674,51 @@ void zombieAtt1b() {
 		startTimer(attTimer1b);
 
 		if (checkCollision(playerIcon, bloodX1, bloodX1 + 30, 250, 250 + 30) == true) {
-			showMessage("be collided!");
+
+			
 
 			hitAlready = true;
 			immuneCnt = IMMUNE_TIME;
 			setTimer(immuneTimer, IMMUNE_TICK);
 			startTimer(immuneTimer);
+
+			playerHp -= 20; // NEED TO REVISE
+			checkHp(PLAYER);
 		}
 
 		else if (checkCollision(playerIcon, bloodX2, bloodX2 + 30, 250, 250 + 30) == true) {
-			showMessage("be collided!");
 
 			hitAlready = true;
 			immuneCnt = IMMUNE_TIME;
 			setTimer(immuneTimer, IMMUNE_TICK);
 			startTimer(immuneTimer);
+
+			playerHp -= 20; // NEED TO REVISE
+			checkHp(PLAYER);
 		}
 
 		else if (checkCollision(playerIcon, 644, 644 + 30, bloodY1, bloodY1 + 30) == true) {
-			showMessage("be collided!");
 
+		
 			hitAlready = true;
 			immuneCnt = IMMUNE_TIME;
 			setTimer(immuneTimer, IMMUNE_TICK);
 			startTimer(immuneTimer);
+
+			playerHp -= 20; // NEED TO REVISE
+			checkHp(PLAYER);
+
 		}
 
 		else if (checkCollision(playerIcon, 644, 644 + 30, bloodY2, bloodY2 + 30) == true) {
-			showMessage("be collided!");
 
 			hitAlready = true;
 			immuneCnt = IMMUNE_TIME;
 			setTimer(immuneTimer, IMMUNE_TICK);
 			startTimer(immuneTimer);
+
+			playerHp -= 20; // NEED TO REVISE
+			checkHp(PLAYER);
 		}
 
 		// if blood cells go outside of rectangle, it disappears 
@@ -759,6 +768,9 @@ void zombieAtt2() {
 		immuneCnt = IMMUNE_TIME;
 		setTimer(immuneTimer, IMMUNE_TICK);
 		startTimer(immuneTimer);
+
+		playerHp -= 20; // NEED TO REVISE
+		checkHp(PLAYER);
 	}
 }
 
@@ -957,7 +969,8 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 
 	// If player clicked attack, then player attacks zombie as much as weapon's level
 	if (object == attack) {
-		printf("MouseCallback: monster hurted \n");
+		enemyHp -= 20; // NEED TO REVISE!
+		checkHp(ENEMY);
 
 		hideObject(attack);
 		hideObject(item);
@@ -1146,7 +1159,7 @@ void keyboardCallback(KeyCode code, KeyState state) {
 		if (currentScene == fight3) {
 			iconDx += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
-
+		
 		if (currentScene == minigame4) {
 			playerWingDx += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
@@ -1247,7 +1260,7 @@ int main() {
 	
 	// Starting a game
 
-	currentScene = towerInside4; //revision! 
-	startGame(towerInside4);
+	currentScene = towerInside3; //revision! 
+	startGame(towerInside3);
 
 }
