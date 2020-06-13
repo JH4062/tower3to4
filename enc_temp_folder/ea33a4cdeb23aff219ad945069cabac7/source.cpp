@@ -1189,7 +1189,7 @@ void keyboardCallback(KeyCode code, KeyState state) {
 		if (frogTShown == true && currentScene == towerInside4 && playerX >= 750) {
 			
 			// in case player tries minigame again
-			frogKill = 0;
+			
 			miniHP = 3;
 			for (int i = 0; i < 3; i++) {
 				showObject(miniHeart[i]);
