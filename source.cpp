@@ -1,7 +1,6 @@
 /* how to play minigame
 
-play for 30 sec 
-after 30sec, if your heart remains, you win!
+kill frogs as much as frogKill_MAX
 
 when player press space bar, flying warrior thorws spear to right side
 
@@ -10,16 +9,17 @@ your heart also disappears unless you throws spear to frog until it dispaears.
 
 */
 
-
-
 // Preprocessor
 #include <bangtal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
-#define ANIMATION_TIME		0.05f
-#define ANIMATION_STEP		30 // movement speed
+// Animation for character's movement
+TimerID moveTimer;
+const Second MOVE_TICK = 0.01f;
+const int MOVE_SPEED = 20;
+
 
 // Scenes and Objects.
 SceneID towerInside3, fight3, towerInside4, minigame4;
@@ -28,9 +28,13 @@ ObjectID attack, item, avoid, zombieF, brain, explosion, blood[4], zomhand;
 
 SceneID currentScene;
 
-//Timer for animation
-TimerID  moveTimer, attTimer0, attTimer1a, attTimer1b, attTimer2, turnTimer,spearTimer;
-TimerID frogSpawnTimer, frogFlyTimer0, frogFlyTimer1, frogFlyTimer2;
+
+//Timer for animation in tower3
+TimerID attTimer0, attTimer1a, attTimer1b, attTimer2;
+const Second ATT_TICK = 0.01f;
+
+//Timer for animation in tower4
+TimerID frogSpawnTimer, frogFlyTimer0, frogFlyTimer1, frogFlyTimer2, spearTimer;;
 
 // Sounds
 SoundID zom, explo, hand;
@@ -56,7 +60,7 @@ int playerHp, playerMaxHp, playerAtk, playerDef;
 int zombieX[3] = { 600, 450, 750 };
 int zombieY = 400;
 
-// Location of blood 
+//  blood 
 int bloodX1 = 644;
 int bloodX2 = 644;
 int bloodY1 = 250;
@@ -68,7 +72,6 @@ int zomhandY = 500;
 
 // curret numbers
 int repeatNum = 0;
-int sceneNum = 0;
 int turnNum = 0;
 
 // Gold
@@ -77,22 +80,24 @@ ObjectID goldList[3];
 int goldX[3] = { 1040, 1067, 1094 };
 int goldY = 595;
 
-//turn
+//turn ========================================================
+TimerID turnTimer;
 int turnCnt = 0;
 const int TURN_TIME = 20;
 const Second TURN_TICK = 0.05f;
 
-// NEW: Variables about immune
+// Const variable for turn
+const int PLAYER = 0;
+const int ENEMY = 1;
+
+// ===============================================================
+
+// Variables about immune
 TimerID immuneTimer;
 int immuneCnt = 0;
 const int IMMUNE_TIME = 20;
 const Second IMMUNE_TICK = 0.05f;
 bool hitAlready = false;
-
-
-//// Const variable for turn
-const int PLAYER = 0;
-const int ENEMY = 1;
 
 // Enemy
 ObjectID enemy;
@@ -104,25 +109,30 @@ const int enemyHpBarX_FIXED = 333, enemyHpBarY_FIXED = 660;
 
 // minigame4
 
-TimerID minigameTimer4;
 SoundID throwSpearSound;
 
 ObjectID frogT, playerWing;
+bool frogTShown = true;
+
 int playerWingX = 100, playerWingY = 300;
 int playerWingDx = 0, playerWingDy = 0;
 const int playerWingX_SIZE = 100, playerWingY_SIZE = 149;
+const int playerWingX_MIN = 0, playerWingX_MAX = 1200;
+const int playerWingY_MIN = 30, playerWingY_MAX = 650;
 
 ObjectID spear, frog[5], miniHeart[3];
 
 int heartX[3] = {100,150,200};
 const int heartY = 600;
+int miniHP = 3;
 
 const int frogY[3] = {100, 300, 500};
 int frogX = 1300;
 int frogY2 = 600;
 int frogRand = 0;
 bool down = true;
-int miniHP = 3;
+int frogKill = 0;
+const int frogKill_MAX = 10; // the number of frog that player has to kill
 
 int spearX = playerWingX;
 int spearY = playerWingY + 50;
@@ -135,14 +145,22 @@ bool spearShown = false;
 void mouseCallback(ObjectID obj, int x, int y, MouseAction action);
 void timerCallback(TimerID timer);
 void keyboardCallback(KeyCode code, KeyState state);
-void Gameinit();
-void Move();
-void RandAtt();
+
+void gameInit();
+
+void playerMove();
+void playerIconMove();
+void playerWingMove();
+
 void Turn();
+
+void randAtt();
 void zombieAtt0();
 void zombieAtt1a();
 void zombieAtt1b();
 void zombieAtt2();
+
+
 // ====================================================================================
 
 
@@ -155,7 +173,7 @@ void Turn() {
 	}
 	// Enemy Turn
 	else if (turnNum % 2 == 1) { // if it's com turn
-		RandAtt();
+		randAtt();
 	}
 }
 
@@ -215,7 +233,7 @@ void showGold(void) {
 	}
 }
 
-void Gameinit() {
+void gameInit() {
 
 	// Scenes
 	towerInside3 = createScene(" towerLevel3", "./Images/Backgrounds/Tower_Inside.png");
@@ -223,15 +241,17 @@ void Gameinit() {
 	towerInside4 = createScene("towerLevel4", "./Images/Backgrounds/Tower_Inside.png");
 	minigame4 = createScene("minigame4", "./Images/Backgrounds/mini3Background.jpg");
 
+	
+
 
 	// ====================================================================
 
 	// Timer for moving
-	moveTimer = createTimer(ANIMATION_TIME);
+	moveTimer = createTimer(MOVE_TICK);
 	startTimer(moveTimer);
 
 	// Timer for turn
-	turnTimer = createTimer(ANIMATION_TIME);
+	turnTimer = createTimer(MOVE_TICK); // revision! :: modify MOVE_TICK to STH else
 
 	// Timer for zombie fight 3 animation
 	attTimer0 = createTimer();
@@ -243,7 +263,6 @@ void Gameinit() {
 	immuneTimer = createTimer(IMMUNE_TICK);
 
 	// Timer for minigame
-	minigameTimer4 = createTimer(30.0f);
 	frogSpawnTimer = createTimer(1.0f);
 	frogFlyTimer0 = createTimer();
 	frogFlyTimer1 = createTimer();
@@ -262,7 +281,7 @@ void Gameinit() {
 	// player
 	player = createObject("./Images/Characters/Warrior_R.png");
 	scaleObject(player, 0.5f);
-	playerX = 1150;
+	playerX = 100;
 	playerY = playerY_FIXED;
 	locateObject(player, currentScene, playerX, playerY);
 	showObject(player);
@@ -407,64 +426,117 @@ bool checkCollision(ObjectID object, int xStart, int xEnd, int yStart, int yEnd)
 
 }
 
-void Move() {
+void playerMove(void) {
+	// Move a player. (towerScene)
 
-	// Movement of warrior
-	if (sceneNum == 3 || sceneNum == 5) {
+	playerX += dx;
 
-		playerX += dx;
-
-
-		if (dx < 0) {
-			setObjectImage(player, "./Images/Characters/Warrior_L.png");
-		}
-		else if (dx > 0) {
-			setObjectImage(player, "./Images/Characters/Warrior_R.png");
-		}
-
-		if (playerX < playerX_MIN) {
-			playerX = playerX_MIN;
-		}
-		else if (playerX > playerX_MAX) {
-			playerX = playerX_MAX;
-		}
-
-		locateObject(player, towerInside3, playerX, 180);
-
+	// Bug fix:
+	// Fixed a bug - Difference between player's direction and image.
+	// Change an image with player's direction.
+	if (dx < 0) {
+		setObjectImage(player, "./Images/Characters/Warrior_L.png");
 	}
 
-	// Movement of icon
-	else if (sceneNum == 4) {
-
-		locateObject(playerIcon, fight3, iconX, iconY);
-
-		// Set a restriction.
-		iconX += iconDx;
-		if (iconX < iconX_MIN) {
-			iconX = iconX_MIN;
-		}
-		else if (iconX > iconX_MAX) {
-			iconX = iconX_MAX;
-		}
-
-		iconY += iconDy;
-		if (iconY < iconY_MIN) {
-			iconY = iconY_MIN;
-		}
-		else if (iconY > iconY_MAX) {
-			iconY = iconY_MAX;
-		}
+	else if (dx > 0) {
+		setObjectImage(player, "./Images/Characters/Warrior_R.png");
 	}
+
+	if (dx < -MOVE_SPEED) {
+		dx = -MOVE_SPEED;
+	}
+	else if (dx > MOVE_SPEED) {
+		dx = MOVE_SPEED;
+	}
+	if (dy < -MOVE_SPEED) {
+		dy = -MOVE_SPEED;
+	}
+	else if (dy > MOVE_SPEED) {
+		dy = MOVE_SPEED;
+	}
+
+	// Set a restriction.
+	if (playerX < playerX_MIN) {
+		playerX = playerX_MIN;
+	}
+	else if (playerX > playerX_MAX) {
+		playerX = playerX_MAX;
+	}
+
+	locateObject(player, currentScene, playerX, playerY);
+
+	setTimer(moveTimer, MOVE_TICK);
+	startTimer(moveTimer);
+}
+
+void playerIconMove(void) {
+	// Move a player-icon. (battleScene)
+
+	// Bug fix:
+	// Fixed a bug.
+	if (iconDx < -MOVE_SPEED) {
+		iconDx = -MOVE_SPEED;
+	}
+	else if (iconDx > MOVE_SPEED) {
+		iconDx = MOVE_SPEED;
+	}
+	if (iconDy < -MOVE_SPEED) {
+		iconDy = -MOVE_SPEED;
+	}
+	else if (iconDy > MOVE_SPEED) {
+		iconDy = MOVE_SPEED;
+	}
+
+
+	// Set a restriction.
+	iconX += iconDx;
+	if (iconX < iconX_MIN) {
+		iconX = iconX_MIN;
+	}
+	else if (iconX > iconX_MAX) {
+		iconX = iconX_MAX;
+	}
+
+	iconY += iconDy;
+	if (iconY < iconY_MIN) {
+		iconY = iconY_MIN;
+	}
+	else if (iconY > iconY_MAX) {
+		iconY = iconY_MAX;
+	}
+
+	locateObject(playerIcon, currentScene, iconX, iconY);
+
+	setTimer(moveTimer, MOVE_TICK);
+	startTimer(moveTimer);
+}
+
+void playerWingMove(void) {
 
 	// Movemnet of Flying Warrior
-	else if (sceneNum == 6) {
+	if (currentScene == minigame4) {
 		playerWingX += playerWingDx;
 		playerWingY += playerWingDy;
 
 		locateObject(playerWing, minigame4, playerWingX, playerWingY);
-		}
 
-	setTimer(moveTimer, ANIMATION_TIME);
+	}
+
+	if (playerWingX < playerWingX_MIN) {
+		playerWingX = playerWingX_MIN;
+	}
+	else if (playerWingX > playerWingX_MAX) {
+		playerWingX = playerWingX_MAX;
+	}
+
+	if (playerWingY < playerWingY_MIN) {
+		playerWingY = playerWingY_MIN;
+	}
+	else if (playerWingY > playerWingY_MAX) {
+		playerWingY = playerWingY_MAX;
+	}
+
+	setTimer(moveTimer, MOVE_TICK);
 	startTimer(moveTimer);
 
 }
@@ -474,7 +546,7 @@ void checkHp(int kind) {
 
 	ObjectID hpBar;
 
-	float hpPercent = 1.0f;
+	float hpPercent;
 
 	if (kind == PLAYER) {
 		hpPercent = static_cast<float>(playerHp) / static_cast<float>(playerMaxHp);
@@ -507,7 +579,7 @@ void checkHp(int kind) {
 }
 
 // Random Pattern
-void RandAtt() {
+void randAtt() {
 
 	repeatNum = 0; //reset repeatNumber
 
@@ -546,7 +618,7 @@ void zombieAtt0() {
 		zombieY -= 60;
 		locateObject(zombieF, fight3, zombieX[repeatNum], zombieY);
 
-		setTimer(attTimer0, ANIMATION_TIME);
+		setTimer(attTimer0, ATT_TICK);
 		startTimer(attTimer0);
 
 		if (zombieY < 0) {
@@ -559,7 +631,7 @@ void zombieAtt0() {
 		printf("ZombieAtt0: be collided! \n");
 	
 		
-		playerHp -= 20;
+		playerHp -= 20; // NEED TO REVISE
 		checkHp(player);
 
 		hitAlready = true;
@@ -601,7 +673,7 @@ void zombieAtt1b() {
 		locateObject(blood[2], fight3, 644, bloodY1);
 		locateObject(blood[3], fight3, 644, bloodY2);
 
-		setTimer(attTimer1b, ANIMATION_TIME);
+		setTimer(attTimer1b, ATT_TICK);
 		startTimer(attTimer1b);
 
 		if (checkCollision(playerIcon, bloodX1, bloodX1 + 30, 250, 250 + 30) == true) {
@@ -667,7 +739,7 @@ void zombieAtt1b() {
 void zombieAtt2() { 
 
 	playSound(hand);
-	zomhandY -= 60;
+	zomhandY -= 50;
 	locateObject(zomhand, fight3, zomhandX[repeatNum], zomhandY);
 	showObject(zomhand);
 
@@ -677,7 +749,7 @@ void zombieAtt2() {
 		repeatNum++;
 	}
 
-	setTimer(attTimer2, ANIMATION_TIME);
+	setTimer(attTimer2, ATT_TICK);
 	startTimer(attTimer2);
 
 	if (checkCollision(playerIcon, zomhandX[repeatNum], (zomhandX[repeatNum] + 50), zomhandY, zomhandY + 70) == true) {
@@ -695,7 +767,7 @@ void zombieAtt2() {
 void miniCheckHP() {
 
 	miniHP--;
-
+	
 	if (miniHP == 2) {
 		hideObject(miniHeart[2]);
 	}
@@ -707,7 +779,7 @@ void miniCheckHP() {
 	else if (miniHP == 0) {
 		hideObject(miniHeart[0]);
 		enterScene(towerInside4);
-		sceneNum = 5;
+		currentScene = towerInside4;
 	}
 
 	
@@ -730,7 +802,7 @@ void frogFly0() {
 		frogX -= 80;
 		locateObject(frog[0], minigame4, frogX, frogY[1]);
 		showObject(frog[0]);
-		setTimer(frogFlyTimer0, ANIMATION_TIME);
+		setTimer(frogFlyTimer0, ATT_TICK);
 		startTimer(frogFlyTimer0);
 		
 		if (checkCollision(spear, frogX, frogX + 100, frogY[1], frogY[1] + 110) == true && spearShown == true) { 
@@ -766,7 +838,7 @@ void frogFly1() {
 		frogX -= 60;
 		locateObject(frog[1], minigame4, frogX, frogY[1]);
 		showObject(frog[1]);
-		setTimer(frogFlyTimer1, ANIMATION_TIME);
+		setTimer(frogFlyTimer1, ATT_TICK);
 		startTimer(frogFlyTimer1);
 
 		if (checkCollision(spear, frogX, frogX + 100, frogY[1], frogY[1] + 110) == true && spearShown == true) {
@@ -777,6 +849,7 @@ void frogFly1() {
 			stopTimer(frogFlyTimer1);
 			setTimer(frogSpawnTimer, 1.0f);
 			startTimer(frogSpawnTimer);
+			frogKill++;
 
 
 		}
@@ -809,10 +882,11 @@ void frogFly2() {
 			frogY2 -= 30;
 			locateObject(frog[2], minigame4, frogX, frogY2);
 			showObject(frog[2]);
-			setTimer(frogFlyTimer2, ANIMATION_TIME);
+			setTimer(frogFlyTimer2, ATT_TICK);
 			startTimer(frogFlyTimer2);
 
 			if (checkCollision(spear, frogX, frogX + 100, frogY2, frogY2 + 80) == true && spearShown == true) {
+				frogKill++;
 				hideObject(frog[2]);
 				stopTimer(frogFlyTimer2);
 				setTimer(frogSpawnTimer, 1.0f);
@@ -832,10 +906,11 @@ void frogFly2() {
 			frogY2 += 30;
 			locateObject(frog[2], minigame4, frogX, frogY2);
 			showObject(frog[2]);
-			setTimer(frogFlyTimer2, ANIMATION_TIME);
+			setTimer(frogFlyTimer2, ATT_TICK);
 			startTimer(frogFlyTimer2);
 
 			if (checkCollision(spear, frogX, frogX + 100, frogY2, frogY2 + 80) == true && spearShown == true) {
+				frogKill++;
 				hideObject(frog[2]);
 				stopTimer(frogFlyTimer2);
 				setTimer(frogSpawnTimer, 1.0f);
@@ -868,7 +943,7 @@ void throwSpear() {
 		showObject(spear);
 
 		
-		setTimer(spearTimer, ANIMATION_TIME);
+		setTimer(spearTimer, ATT_TICK);
 		startTimer(spearTimer);
 		spearShown = true;
 	}
@@ -901,8 +976,9 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 	// If player clicked avoid, then player goes back to towerInside3
 	if (object == avoid) {
 		enterScene(towerInside3);
-		sceneNum = 3;
-
+		
+		
+		// revision! :: currentScene = where?
 		turnCnt = 0;
 		turnNum = 0;
 	}
@@ -912,7 +988,18 @@ void timerCallback(TimerID timer) {
 
 	if (timer == moveTimer) {
 		//animation of movement
-		Move();
+
+		if (timer == moveTimer) {
+			if (currentScene == towerInside3 || currentScene == towerInside4) {
+				playerMove();
+			}
+			else if (currentScene == fight3) {
+				playerIconMove();
+			}
+			else if (currentScene == minigame4) {
+				playerWingMove();
+			}
+		}
 	}
 
 	if (timer == turnTimer) {
@@ -985,28 +1072,41 @@ void timerCallback(TimerID timer) {
 
 	if (timer == frogSpawnTimer) {
 
+		if (frogKill < frogKill_MAX) { // player has to kill frog as much as frog kill_MAX
+
 		frogX = 1300;
 
 		srand((unsigned int)time(NULL));
 		frogRand = rand() % 3;
 
-		switch (frogRand) {
-		case 0:
-			frogFly0();
-			startTimer(frogFlyTimer0);
-			break;
+			switch (frogRand) {
+			case 0:
+				frogFly0();
+				startTimer(frogFlyTimer0);
+				break;
 	
-		case 1:
-			frogFly1();
-			startTimer(frogFlyTimer1);
-			break;
+			case 1:
+				frogFly1();
+				startTimer(frogFlyTimer1);
+				break;
 
-		case 2:
-			frogFly2();
-			startTimer(frogFlyTimer2);
-			break;
+			case 2:
+				frogFly2();
+				startTimer(frogFlyTimer2);
+				break;
+			}
+
 		}
 
+		else { // if player kills frog as much as frogKill_MAX, player can go next floor
+
+			hideObject(frogT);
+			frogTShown = false;
+
+			currentScene = towerInside4;
+			enterScene(towerInside4);
+
+		}
 	}
 
 	if (timer == frogFlyTimer0) {
@@ -1027,9 +1127,6 @@ void timerCallback(TimerID timer) {
 		throwSpear();
 	}
 
-	if (timer == minigameTimer4) {
-		enterScene(towerInside4);
-	}
 
 	//=======================================================================================
 }
@@ -1040,48 +1137,94 @@ void keyboardCallback(KeyCode code, KeyState state) {
 
 	if (code == 83) {				// RIGHT
 
-		dx += (state == KeyState::KEYBOARD_PRESSED ? ANIMATION_STEP : -ANIMATION_STEP);
-		iconDx += (state == KeyState::KEYBOARD_PRESSED ? ANIMATION_STEP : -ANIMATION_STEP);
-		playerWingDx += (state == KeyState::KEYBOARD_PRESSED ? ANIMATION_STEP : -ANIMATION_STEP);
+		
+		if (currentScene == towerInside3 || currentScene == towerInside4) {
+			dx += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
+
+		}
+
+		if (currentScene == fight3) {
+			iconDx += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
+		}
+
+		if (currentScene == minigame4) {
+			playerWingDx += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
+		}
+
+		
 	}
 
 	else if (code == 82) {			//LEFT
 
-		dx -= (state == KeyState::KEYBOARD_PRESSED ? ANIMATION_STEP : -ANIMATION_STEP);
-		iconDx -= (state == KeyState::KEYBOARD_PRESSED ? ANIMATION_STEP : -ANIMATION_STEP);
-		playerWingDx -= (state == KeyState::KEYBOARD_PRESSED ? ANIMATION_STEP : -ANIMATION_STEP);
+		if (currentScene == towerInside3 || currentScene == towerInside4) {
+			dx -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
+
+		}
+
+		if (currentScene == fight3) {
+			iconDx -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
+		}
+
+		if (currentScene == minigame4) {
+			playerWingDx -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
+		}
 
 	}
 
 	else if (code == 84) {			// UP
 
-		iconDy += (state == KeyState::KEYBOARD_PRESSED ? ANIMATION_STEP : -ANIMATION_STEP);
-		playerWingDy += (state == KeyState::KEYBOARD_PRESSED ? ANIMATION_STEP : -ANIMATION_STEP);
+		
 
-		if (sceneNum == 3 && playerX >= 750) {
+		if (currentScene == towerInside3 && playerX >= 750) { 
 			currentScene = fight3;
 			enterScene(fight3);
 						
 		}
 
-		if (sceneNum == 5 && playerX >= 750) {
-			sceneNum = 6;
+		if (currentScene == fight3) {
+			iconDy += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
+
+		}
+
+		if (frogTShown == true && currentScene == towerInside4 && playerX >= 750) {
+			
+			// in case player tries minigame again
+			
+			miniHP = 3;
+			for (int i = 0; i < 3; i++) {
+				showObject(miniHeart[i]);
+			}
+
+			startTimer(frogSpawnTimer);
+
+			currentScene = minigame4;
 			enterScene(minigame4);
 			
+		}
+
+		if (currentScene == minigame4) {
+			playerWingDy += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 
 		
 	}
 
 	else if (code == 85) {		// DOWN
-		iconDy -= (state == KeyState::KEYBOARD_PRESSED ? ANIMATION_STEP : -ANIMATION_STEP);
-		playerWingDy -= (state == KeyState::KEYBOARD_PRESSED ? ANIMATION_STEP : -ANIMATION_STEP);
+
+		if (currentScene == fight3) {
+			iconDy -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
+		}
+
+		if (currentScene == minigame4) {
+			playerWingDy -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
+		}
+
 
 	}
 
 	else if (code == 75) {		// SPACEBAR
 		
-		if (spearShown == false && state == KeyState::KEYBOARD_PRESSED ) {
+		if (currentScene == minigame4 && spearShown == false && state == KeyState::KEYBOARD_PRESSED ) {
 			playSound(throwSpearSound);
 			spearX = playerWingX;
 			spearY = playerWingY + 50;
@@ -1099,16 +1242,12 @@ int main() {
 	setKeyboardCallback(keyboardCallback);
 
 	//Setting elements needed to play game
-	Gameinit();
+	gameInit();
 
-	//============temporary==============================
-	showTimer(minigameTimer4);
-	startTimer(minigameTimer4);
-	startTimer(frogSpawnTimer);
-	sceneNum = 6;
-	//====================================================
-
+	
 	// Starting a game
-	startGame(minigame4);
+
+	currentScene = towerInside4; //revision! 
+	startGame(towerInside4);
 
 }
