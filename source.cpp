@@ -32,7 +32,7 @@ public:
 	};
 };
 
-
+ObjectID casino;
 
 // Animation for character's movement
 TimerID moveTimer;
@@ -45,8 +45,11 @@ ObjectID zombieT;
 ObjectID attack, item, avoid, zombieF, brain, explosion, blood[4], zomhand;
 SceneID gameOverScene;
 SceneID villageLeftScene;
+SceneID villageScene;
 SceneID tower5F_Scene, battle5F_Scene;
 SceneID tower6F_Scene, game6F_Scene;
+//SceneID tower1F_Scene, battle1F_Scene;
+SceneID storeScene;
 
 SceneID currentScene;
 
@@ -69,7 +72,24 @@ bool isNight = false;
 
 // Structures and messages
 ObjectID house;
+ObjectID store, tower;
 ObjectID messageObj;
+
+// Objects about store
+ObjectID item0, item1, item2, item3, item4, item5,item6, item7, item8, item9, item10, item11, item12;
+ObjectID soldOut[10], box[10], price[10], itemBox, storePixel[3], storeRightArrow, storeLeftArrow, storeList1, storeList2, storeList3, storeBackGround, backToTown;
+
+//Locations of storePixel
+int storePixelX[3] = { 570, 770, 970 };
+int storeListX[3] = { 530, 660, 790 };
+
+//Check if items are sold or not
+bool soldOuted[11] = { false, false, false, false, false, false, false, false, false, false, false };
+
+// Characters (Not Implemented)
+ObjectID merchant;
+
+ObjectID CanNotRestMessage;
 
 
 // Player 
@@ -224,7 +244,11 @@ TimerID messageTimer;
 int messageCnt = 0;
 const int MESSAGE_TIME = 1;
 const Second MESSAGE_TICK = 1.0f;
-
+/*
+//Animation for 1st floor battle
+TimerID dropTimer;
+const Second SNOW_TICK = 0.1f;
+*/
 // Animation for game over
 TimerID gameOverTimer;
 int overCnt = 0;
@@ -428,7 +452,7 @@ void gameInit() {
 
 
 	// Scenes
-
+	villageScene = createScene("villageScene", "./Images/Backgrounds/DayTime.png");
 	tower3F_Scene = createScene(" towerLevel3", "./Images/Backgrounds/Tower_Inside.png");
 	battle3F_Scene = createScene("zombie", "./Images/Backgrounds/Battle.png");
 	tower4F_Scene = createScene("towerLevel4", "./Images/Backgrounds/Tower_Inside.png");
@@ -459,7 +483,7 @@ void gameInit() {
 	outButton = createObject("./Images/UI/Puzzle/OutButton.png");
 	locateObject(outButton, game6F_Scene, puzzleX[2] + 187, puzzleY[2] - 5);
 	showObject(outButton);
-
+	
 
 
 	// ====================================================================
@@ -489,13 +513,28 @@ void gameInit() {
 	spearTimer = createTimer();
 
 	// =====================================================================
+		/*
+	//Enemy in 1st floor
+	ObjectID enemy1FTower;
+	ObjectID enemy1FBattle;
+	int enemyX, enemyY;
+	int enemyHp, enemyMaxHp, enemyAtk, enemyDef;
+	const int enemyY_FIXED = 410;
+	const int enemyHpBarX_FIXED = 333, enemyHpBarY_FIXED = 660;
 
+	//Enemy in 1st floor's monster attack
+	ObjectID snow;
+	int snowX[5] = { 410, 460, 510, 550, 590 };
+	int snowY = 380;
+	*/
+	// =====================================================================
 	// Sound effects
 	zom = createSound("./Audios/tower3/zombieWalk.mp3");
 	explo = createSound("./Audios/tower3/explosion.mp3");
 	hand = createSound("./Audios/tower3/zombieHand.mp3");
 	hitSound = createSound("./Audios/HitSound.wav");
 	attackSound = createSound("./Audios/AttackSound.wav");
+
 
 	// Enemy
 	enemy = createObject("./Images/Enemies/BlackKnight.png");
@@ -579,6 +618,283 @@ void gameInit() {
 
 	// zomebi's hand
 	zomhand = createObject("./Images/Enemies/tower3/zomhand.png");
+	// store  ===================================================================================
+	storeScene = createScene("storeScene", "./Images/Backgrounds/Store_Inside.png");
+
+
+	casino = createObject("./Images/Structures/Casino.png");
+	locateObject(casino, villageLeftScene, 117, 195);
+	showObject(casino);
+
+	house = createObject("./Images/Structures/House.png");
+	locateObject(house, villageLeftScene, 800, 195);
+	showObject(house);
+
+	for (int i = 0; i < 3; i++) {
+			scaleObject(goldList[i], 0.8f);
+			locateObject(goldList[i], storeScene, goldX[i], goldY);  // NEED TO REIVSE
+		}
+
+
+
+	//store
+	store = createObject("./Images/Structures/Store.png");
+	locateObject(store, villageScene, 117, 195);
+	showObject(store);
+
+	//tower
+	tower = createObject("./Images/Structures/Tower.png");
+	locateObject(tower, villageScene, 817, 195);
+	showObject(tower);
+
+	//storeArrow
+	storeBackGround = createObject("./Images/Items/Store/UI/store_background.png");
+	locateObject(storeBackGround, storeScene, 530, 180);
+	scaleObject(storeBackGround, 0.55f);
+	showObject(storeBackGround);
+
+	//storePixel[3]
+	for (int j = 0; j < 3; j++) {
+		storePixel[j] = createObject("./Images/Items/Store/UI/StorePixel.png");
+		locateObject(storePixel[j], storeScene, storePixelX[j], 192);
+		scaleObject(storePixel[j], 0.5f);
+		showObject(storePixel[j]);
+	}
+
+	//storeArrow
+	storeRightArrow = createObject("./Images/Items/Store/UI/Store_rightarrow.png");
+	locateObject(storeRightArrow, storeScene, 1175, 330);
+	scaleObject(storeRightArrow, 0.6f);
+	showObject(storeRightArrow);
+
+	storeLeftArrow = createObject("./Images/Items/Store/UI/Store_leftarrow.png");
+	locateObject(storeLeftArrow, storeScene, 1175, 330);
+	scaleObject(storeLeftArrow, 0.6f);
+	hideObject(storeLeftArrow);
+
+	//coin
+	coin = createObject("./Images/Items/Coin.png");
+	locateObject(coin, storeScene, 1000, 650);
+	scaleObject(coin, 0.6f);
+	showObject(coin);
+
+	//price[10]
+	int priceX[3] = { 593, 793, 993 };
+	int priceY = 200;
+
+	price[0] = createObject("./Images/Numbers/1.png");
+	locateObject(price[0], storeScene, priceX[0], priceY);
+	scaleObject(price[0], 0.7f);
+	showObject(price[0]);
+
+	price[1] = createObject("./Images/Numbers/1.png");
+	locateObject(price[1], storeScene, priceX[1], priceY);
+	scaleObject(price[1], 0.7f);
+	showObject(price[1]);
+
+	price[2] = createObject("./Images/Numbers/5.png");
+	locateObject(price[2], storeScene, priceX[2], priceY);
+	scaleObject(price[2], 0.7f);
+	showObject(price[2]);
+
+	price[3] = createObject("./Images/Numbers/6.png");
+	locateObject(price[3], storeScene, priceX[0], priceY);
+	scaleObject(price[3], 0.7f);
+	hideObject(price[3]);
+
+	price[4] = createObject("./Images/Numbers/1.png");
+	locateObject(price[4], storeScene, priceX[0], priceY);
+	scaleObject(price[4], 0.7f);
+	hideObject(price[4]);
+
+	price[5] = createObject("./Images/Numbers/3.png");
+	locateObject(price[5], storeScene, priceX[1], priceY);
+	scaleObject(price[5], 0.7f);
+	hideObject(price[5]);
+
+	price[6] = createObject("./Images/Numbers/5.png");
+	locateObject(price[6], storeScene, priceX[2], priceY);
+	scaleObject(price[6], 0.7f);
+	hideObject(price[6]);
+
+	price[7] = createObject("./Images/Numbers/2.png");
+	locateObject(price[7], storeScene, priceX[0], priceY);
+	scaleObject(price[7], 0.7f);
+	hideObject(price[7]);
+
+	price[8] = createObject("./Images/Numbers/4.png");
+	locateObject(price[8], storeScene, priceX[1], priceY);
+	scaleObject(price[8], 0.7f);
+	hideObject(price[8]);
+
+	price[9] = createObject("./Images/Numbers/5.png");
+	locateObject(price[9], storeScene, priceX[2], priceY);
+	scaleObject(price[9], 0.7f);
+	hideObject(price[9]);
+
+	//storeList[3]
+
+	storeList1 = createObject("./Images/Items/Store/UI/StoreList1.png");
+	locateObject(storeList1, storeScene, 570, 472);
+	scaleObject(storeList1, 0.6f);
+	showObject(storeList1);
+
+	storeList2 = createObject("./Images/Items/Store/UI/StoreList2.png");
+	locateObject(storeList2, storeScene, 770, 472);
+	scaleObject(storeList2, 0.6f);
+	showObject(storeList2);
+
+	storeList3 = createObject("./Images/Items/Store/UI/StoreList3.png");
+	locateObject(storeList3, storeScene, 970, 472);
+	scaleObject(storeList3, 0.6f);
+	showObject(storeList3);
+
+	//item[13]
+	item0 = createObject("./Images/Items/Store/Equipments/Sword.png");
+	locateObject(item0, storeScene, 600, 320);
+	scaleObject(item0, 0.7f);
+	showObject(item0);
+
+	item1 = createObject("./Images/Items/Store/Equipments/Shield.png");
+	locateObject(item1, storeScene, 790, 320);
+	scaleObject(item1, 0.7f);
+	showObject(item1);
+
+	item2 = createObject("./Images/Items/Store/Equipments/Axe.png");
+	locateObject(item2, storeScene, 1000, 320);
+	scaleObject(item2, 0.7f);
+	showObject(item2);
+
+	item3 = createObject("./Images/Items/Store/Equipments/Spear.png");
+	locateObject(item3, storeScene, 600, 320);
+	scaleObject(item3, 0.7f);
+	hideObject(item3);
+
+	item4 = createObject("./Images/Items/Store/Potions/BluePotion.png");
+	locateObject(item4, storeScene, 605, 320);
+	scaleObject(item4, 0.5f);
+	hideObject(item4);
+
+	item10 = createObject("./Images/Items/Store/Potions/BluePotion.png");
+	locateObject(item10, storeScene, 605, 320);
+	scaleObject(item10, 0.5f);
+	hideObject(item10);
+
+	item5 = createObject("./Images/Items/Store/Potions/GreenPotion.png");
+	locateObject(item5, storeScene, 805, 320);
+	scaleObject(item5, 0.5f);
+	hideObject(item5);
+
+	item11 = createObject("./Images/Items/Store/Potions/GreenPotion.png");
+	locateObject(item11, storeScene, 805, 320);
+	scaleObject(item11, 0.5f);
+	hideObject(item11);
+
+	item6 = createObject("./Images/Items/Store/Potions/RedPotion.png");
+	locateObject(item6, storeScene, 1005, 320);
+	scaleObject(item6, 0.5f);
+	hideObject(item6);
+
+	item12 = createObject("./Images/Items/Store/Potions/RedPotion.png");
+	locateObject(item12, storeScene, 1005, 320);
+	scaleObject(item12, 0.5f);
+	hideObject(item12);
+
+	item7 = createObject("./Images/Items/Store/Potions/Meat.png");
+	locateObject(item7, storeScene, 605, 320);
+	scaleObject(item7, 0.5f);
+	hideObject(item7);
+
+	item8 = createObject("./Images/Items/Store/Potions/Mushroom.png");
+	locateObject(item8, storeScene, 805, 320);
+	scaleObject(item8, 0.5f);
+	hideObject(item8);
+
+	item9 = createObject("./Images/Items/Store/Potions/Carrot.png");
+	locateObject(item9, storeScene, 1005, 320);
+	scaleObject(item9, 0.3f);
+	hideObject(item9);
+
+	backToTown = createObject("./Images/UI/Store/BackToTown.png");
+	locateObject(backToTown, storeScene, 24, 640);
+	scaleObject(backToTown, 0.35f);
+	showObject(backToTown);
+
+	merchant = createObject("./Images/Characters/MerchantIcon.png");
+	locateObject(merchant, storeScene, 130, 0);
+	scaleObject(merchant, 1.1f);
+	showObject(merchant);
+
+	soldOut[0] = createObject("./Images/Items/Store/UI/soldOut.png");
+	locateObject(soldOut[0], storeScene, 563, 350);
+	scaleObject(soldOut[0], 0.7f);
+	hideObject(soldOut[0]);
+
+	soldOut[3] = createObject("./Images/Items/Store/UI/soldOut.png");
+	locateObject(soldOut[3], storeScene, 563, 350);
+	scaleObject(soldOut[3], 0.7f);
+	hideObject(soldOut[3]);
+
+	soldOut[4] = createObject("./Images/Items/Store/UI/soldOut.png");
+	locateObject(soldOut[4], storeScene, 563, 350);
+	scaleObject(soldOut[4], 0.7f);
+	hideObject(soldOut[4]);
+
+	soldOut[7] = createObject("./Images/Items/Store/UI/soldOut.png");
+	locateObject(soldOut[7], storeScene, 563, 350);
+	scaleObject(soldOut[7], 0.7f);
+	hideObject(soldOut[7]);
+
+	soldOut[1] = createObject("./Images/Items/Store/UI/soldOut.png");
+	locateObject(soldOut[1], storeScene, 763, 350);
+	scaleObject(soldOut[1], 0.7f);
+	hideObject(soldOut[1]);
+
+	soldOut[5] = createObject("./Images/Items/Store/UI/soldOut.png");
+	locateObject(soldOut[5], storeScene, 763, 350);
+	scaleObject(soldOut[5], 0.7f);
+	hideObject(soldOut[5]);
+
+	soldOut[8] = createObject("./Images/Items/Store/UI/soldOut.png");
+	locateObject(soldOut[8], storeScene, 763, 350);
+	scaleObject(soldOut[8], 0.7f);
+	hideObject(soldOut[8]);
+
+	soldOut[2] = createObject("./Images/Items/Store/UI/soldOut.png");
+	locateObject(soldOut[2], storeScene, 963, 350);
+	scaleObject(soldOut[2], 0.7f);
+	hideObject(soldOut[2]);
+
+	soldOut[6] = createObject("./Images/Items/Store/UI/soldOut.png");
+	locateObject(soldOut[6], storeScene, 963, 350);
+	scaleObject(soldOut[6], 0.7f);
+	hideObject(soldOut[6]);
+
+	soldOut[9] = createObject("./Images/Items/Store/UI/soldOut.png");
+	locateObject(soldOut[9], storeScene, 963, 350);
+	scaleObject(soldOut[9], 0.7f);
+	hideObject(soldOut[9]);
+
+	int boxX[10] = { 573, 773, 973, 573, 598, 798, 998, 563, 757, 957 };
+	int boxY[10] = { 180, 180, 180, 180, 180, 180, 180, 185, 185, 185 };
+	char boxImage[100];
+	for (int i = 0; i < 10; i++) {
+		sprintf_s(boxImage, "./Images/Items/Store/UI/Box_%d.png", i);
+		box[i] = createObject(boxImage);
+		locateObject(box[i], storeScene, boxX[i], boxY[i]);
+		scaleObject(box[i], 0.6f);
+		if ((i == 0) || (i == 1) || (i == 2)) {
+			showObject(box[i]);
+		}
+		else if ((i == 7) || (i == 8) || (i == 9)) {
+			locateObject(box[i], storeScene, boxX[i] + 5, boxY[i]);
+			scaleObject(box[i], 0.4f);
+		}
+		else {
+			hideObject(box[i]);
+
+		}
+	}
 
 	// casion ===================================================================================
 
@@ -620,7 +936,7 @@ void gameInit() {
 
 	for (int i = 0; i < 3; i++) {
 		scaleObject(goldList[i], 0.8f);
-		locateObject(goldList[i], casinoScene, goldX[i], goldY);  // NEED TO REIVSE
+		locateObject(goldList[i], storeScene, goldX[i], goldY);  // NEED TO REIVSE
 	}
 
 	showGold();
@@ -666,7 +982,7 @@ void changeToNight(void) {
 	if (not isNight) {
 		isNight = true;
 		setSceneImage(villageLeftScene, "./Images/Backgrounds/NightTime.png");
-		// setSceneImage(villageRightScene, "./Images/Backgrounds/NightTime.png");
+		setSceneImage(villageScene, "./Images/Backgrounds/NightTime.png");
 	}
 }
 
@@ -679,7 +995,7 @@ void rest(void) {
 			day += 1;
 
 			setSceneImage(villageLeftScene, "./Images/Backgrounds/DayTime.png");
-			// setSceneImage(villageRightScene, "./Images/Backgrounds/DayTime.png");
+			setSceneImage(villageScene, "./Images/Backgrounds/DayTime.png");
 			isNight = false;
 		}
 		else {
@@ -692,16 +1008,7 @@ void rest(void) {
 		}
 	}
 	else {
-		// If time is not a night, show message about using house.
-		ObjectID canNotRest = createObject("./Images/Messages/CanNotRest.png");
-		locateObject(canNotRest, villageLeftScene, 0, 0);
-		showObject(canNotRest);
-
-		// Using animations.
-		messageCnt = MESSAGE_TIME;
-		messageObj = canNotRest;
-		setTimer(messageTimer, MESSAGE_TICK);
-		startTimer(messageTimer);
+		showMessage("밤에만 잘 수 있어요");
 	}
 }
 
@@ -1603,14 +1910,16 @@ void throwSpear() {
 
 
 void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
+	if (object == CanNotRestMessage) {
+		hideObject(CanNotRestMessage);
+	}
 	
-
 	if (object == attackButton) {
 
 		enemyHp -= (playerAtk - enemyDef > 0 ? playerAtk - enemyDef : 1);
 		playSound(attackSound);
 		checkHp(ENEMY);
-		
+
 		hideObject(attackButton);
 		hideObject(itemButton);
 		hideObject(avoidButton);
@@ -1629,10 +1938,12 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 			setTimer(turnTimer, TURN_TICK);
 			startTimer(turnTimer);
 		}
-		
+
 		if (enemyHp <= 0 and currentScene == battle5F_Scene) {
 			enemyTShown = false;
 			hideObject(enemyT);
+
+			gold += 100;
 
 			currentScene = tower5F_Scene;
 			enterScene(tower5F_Scene);
@@ -1641,6 +1952,8 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 		if (zombieFHp <= 0 and currentScene == battle3F_Scene) {
 			enemyShown = false;
 			hideObject(zombieT);
+
+			gold += 10;
 
 			currentScene = tower3F_Scene;
 			enterScene(tower3F_Scene);
@@ -1654,6 +1967,7 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 			startTimer(turnTimer);
 		}
 	}
+	
 	else if (object == itemButton) {
 		// do something with item.
 	}
@@ -1665,6 +1979,7 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 		hideObject(itemButton);
 		hideObject(avoidButton);
 
+		changeToNight();
 		enterScene(villageLeftScene);
 		currentScene = villageLeftScene;
 	}
@@ -1725,13 +2040,338 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 
 		hideObject(miniGameMessage4);
 	}
+	//store
+	else if (currentScene = storeScene) {
+		if (object == backToTown) {
+		enterScene(villageScene);
+		currentScene = villageScene;
+		showObject(player);
+		}
+		else if (object == merchant) {
+		showMessage("you can buy things to kill monster");
+		}
+	
+		else if (object == storeList1) {
+			for (int i = 0; i < 3; i++) {
+				showObject(box[i]);
+				if (soldOuted[i] == true) {//if the user bought the item, show "soldOut.png" by determining bool soldOuted[i] 
+					showObject(soldOut[i]);
+				}
+				showObject(price[i]);
+			}
+			showObject(item0);
+			showObject(item1);
+			showObject(item2);
+			showObject(storeRightArrow);
+			for (int i = 4; i < 10; i++) {
+				hideObject(soldOut[i]);
+				hideObject(box[i]);
+				hideObject(price[i]);
+			}
+			hideObject(item3);
+			hideObject(item4);
+			hideObject(item5);
+			hideObject(item6);
+			hideObject(item7);
+			hideObject(item8);
+			hideObject(item9);
+		}
+	}
+
+	else if (object == storeList2) {
+		for (int i = 0; i < 4; i++) {
+			hideObject(soldOut[i]);
+			hideObject(box[i]);
+			hideObject(price[i]);
+		}
+		hideObject(item0);
+		hideObject(item1);
+		hideObject(item2);
+		hideObject(item3);
+		hideObject(item8);
+		hideObject(item9);
+		for (int i = 7; i < 10; i++) {
+			
+			hideObject(soldOut[i]);
+			hideObject(box[i]);
+			hideObject(price[i]);
+		}
+		for (int i = 4; i < 7; i++) {
+			showObject(box[i]);
+			if (soldOuted[i] == true) {
+				showObject(soldOut[i]);
+			}
+			showObject(price[i]);
+		}
+		showObject(item4);
+		showObject(item5);
+		showObject(item6);
+		showObject(item7);
+		hideObject(storeRightArrow);
+		hideObject(storeLeftArrow);
+	}
+	else if (object == storeList3) {
+		for (int i = 0; i < 8; i++) {
+			hideObject(soldOut[i]);
+			hideObject(box[i]);
+			hideObject(price[i]);
+		}
+		hideObject(item0);
+		hideObject(item1);
+		hideObject(item2);
+		hideObject(item3);
+		hideObject(item4);
+		hideObject(item5);
+		hideObject(item6);
+		hideObject(item7);
+
+		for (int i = 7; i < 10; i++) {
+			showObject(box[i]);
+			showObject(price[i]);
+			if (soldOuted[i] == true) {
+				showObject(soldOut[i]);
+			}
+		}
+		showObject(item7);
+		showObject(item8);
+		showObject(item9);
+		hideObject(storeRightArrow);
+		hideObject(storeLeftArrow);
+
+	}
+	else if (object == storeRightArrow) {
+		for (int i = 0; i < 3; i++) {
+			hideObject(soldOut[i]);
+			hideObject(box[i]);
+			hideObject(price[i]);
+		}
+		hideObject(item0);
+		hideObject(item1);
+		hideObject(item2);
+		hideObject(storeRightArrow);
+		showObject(item3);
+		showObject(box[3]);
+		showObject(price[3]);
+		if (soldOuted[3] == true) {//if the user bought the item, show "soldOut.png" by determining bool soldOuted[i] 
+			showObject(soldOut[3]);
+		}
+		showObject(storeLeftArrow);
+
+	}
+	else if (object == storeLeftArrow) {
+		hideObject(item3);
+		hideObject(box[3]);
+		hideObject(soldOut[3]);
+		hideObject(price[3]);
+		showObject(storeRightArrow);
+		hideObject(storeLeftArrow);
+		for (int i = 0; i < 3; i++) {
+			showObject(box[i]);
+			showObject(price[i]);
+			if (soldOuted[i] == true) {//if the user bought the item, show "soldOut.png" by determining bool soldOuted[i] 
+				showObject(soldOut[i]);
+			}
+		}
+		showObject(item0);
+		showObject(item1);
+		showObject(item2);
+	}
+	else if (object == item0) {
+
+		if (gold > 10) {
+			pickObject(item0);
+			gold = gold - 10;
+			showGold();
+			showObject(soldOut[0]);
+			soldOuted[0] = true;
+			// playSound(cash);
+		}
+		else {
+			showMessage("you need more cash");
+		}
+	}
+
+
+	else if (object == item1) {
+
+		if (gold > 10) {
+			pickObject(item1);
+			gold = gold - 10;
+			showGold();
+			showObject(soldOut[1]);
+			soldOuted[1] = true;
+			// playSound(cash);
+		}
+		else {
+			showMessage("you need more cash");
+		}
+	}
+
+	else if (object == item2) {
+
+		if (gold > 30) {
+			pickObject(item2);
+			gold = gold - 30;
+			showGold();
+			showObject(soldOut[2]);
+			soldOuted[2] = true;
+			// playSound(cash);
+		}
+		else {
+			showMessage("you need more cash");
+		}
+
+	}
+
+
+
+	else if (object == item3) {
+
+		if (gold > 50) {
+			pickObject(item3);
+			gold = gold - 50;
+			showGold();
+			showObject(soldOut[3]);
+			soldOuted[3] = true;
+			// playSound(cash);
+		}
+		else {
+			showMessage("you need more cash");
+		}
+		/*
+		else if (currentScene = battle1F_Scene) {
+			if (pushatk == true) {
+				n = n + 35;;//will adapt changed checkhp method m means player's damage
+			}
+		}*/
+	}
+	else if (object == item4) {
+
+		if (gold > 10) {
+			pickObject(item4);
+			gold = gold - 10;
+			showGold();
+			// playSound(cash);
+			showObject(item10);
+		}
+		else {
+			showMessage("you need more cash");
+		}
+	}
+	else if (object == item10) {
+		if (gold > 10) {
+			pickObject(item10);
+			gold = gold - 10;
+			showGold();
+			showObject(soldOut[4]);
+			soldOuted[4] = true;
+			// playSound(cash);
+		}
+		else {
+			showMessage("you need more cash");
+		}
+	}
+	else if (object == item7) {
+		if (gold > 15) {
+			pickObject(item7);
+			gold = gold - 15;
+			showGold();
+			showObject(soldOut[7]);
+			soldOuted[7] = true;
+			// playSound(cash);
+		}
+		else {
+			showMessage("you need more cash");
+		}
+	}
+
+	else if (object == item5) {
+		if (gold > 20) {
+			pickObject(item5);
+			gold = gold - 20;
+			showGold();
+			showObject(item11);
+			// playSound(cash);
+		}
+		else {
+			showMessage("you need more cash");
+		}
+	}
+
+	else if (object == item11) {
+		if (gold > 20) {
+			pickObject(item11);
+			gold = gold - 20;
+			showGold();
+			showObject(soldOut[5]);
+			soldOuted[5] = true;
+			// playSound(cash);
+		}
+		else {
+			showMessage("you need more cash");
+		}
+	}
+
+	else if (object == item6) {
+		if (gold > 30) {
+			pickObject(item6);
+			gold = gold - 30;
+			showGold();
+			showObject(item12);
+			// playSound(cash);
+		}
+		else {
+			showMessage("you need more cash");
+		}
+	}
+	else if (object == item12) {
+		if (gold > 30) {
+			pickObject(item12);
+			gold = gold - 30;
+			showGold();
+			showObject(soldOut[6]);
+			soldOuted[6] = true;
+			// playSound(cash);
+		}
+		else {
+			showMessage("you need more cash");
+		}
+	}
+	else if (object == item8) {
+		if (gold > 25) {
+			pickObject(item8);
+			gold = gold - 25;
+			showGold();
+			showObject(soldOut[8]);
+			soldOuted[8] = true;
+			// playSound(cash);
+		}
+		else {
+			showMessage("you need more cash");
+		}
+	}
+
+	else if (object == item9) {
+		if (gold > 30) {
+			pickObject(item9);
+			gold = gold - 30;
+			showGold();
+			showObject(soldOut[9]);
+			soldOuted[9] = true;
+			// playSound(cash);
+		}
+		else {
+			showMessage("you need more cash");
+		}
+	}
+
 }
 
 void timerCallback(TimerID timer) {
 
 	if (timer == moveTimer) {
 
-		if (currentScene == villageLeftScene or currentScene == tower3F_Scene || currentScene == tower4F_Scene || currentScene == tower5F_Scene or currentScene == tower6F_Scene) {
+		if (currentScene == villageScene or currentScene == villageLeftScene or currentScene == tower3F_Scene || currentScene == tower4F_Scene || currentScene == tower5F_Scene or currentScene == tower6F_Scene) {
 			playerMove();
 		}
 
@@ -1743,7 +2383,7 @@ void timerCallback(TimerID timer) {
 
 		}
 
-		else if (currentScene == game6F_Scene) {
+		else if (currentScene == game6F_Scene or currentScene == storeScene or currentScene == casinoScene) {
 			setTimer(moveTimer, MOVE_TICK);
 			startTimer(moveTimer);
 		}
@@ -2086,7 +2726,7 @@ void keyboardCallback(KeyCode code, KeyState state) {
 	if (code == 83) {				// RIGHT
 
 		
-		if (currentScene == tower3F_Scene || currentScene == tower4F_Scene or currentScene == tower5F_Scene or currentScene == tower6F_Scene) {
+		if (currentScene == villageLeftScene or currentScene == villageScene or currentScene == tower3F_Scene || currentScene == tower4F_Scene or currentScene == tower5F_Scene or currentScene == tower6F_Scene) {
 			dx += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 
 		}
@@ -2105,7 +2745,7 @@ void keyboardCallback(KeyCode code, KeyState state) {
 
 	else if (code == 82) {			//LEFT
 
-		if (currentScene == tower3F_Scene || currentScene == tower4F_Scene or currentScene == tower5F_Scene or currentScene == tower6F_Scene) {
+		if (currentScene == villageLeftScene or currentScene == villageScene or currentScene == tower3F_Scene || currentScene == tower4F_Scene or currentScene == tower5F_Scene or currentScene == tower6F_Scene or currentScene == villageScene) {
 			dx -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 
 		}
@@ -2121,6 +2761,19 @@ void keyboardCallback(KeyCode code, KeyState state) {
 	}
 
 	else if (code == 84) {			// UP
+
+		if (currentScene == villageLeftScene && playerX >= 170 && playerX <= 270) {
+			enterScene(casinoScene);
+			currentScene = casinoScene;
+
+			for (int i = 0; i < 3; i++) {
+				scaleObject(goldList[i], 0.8f);
+				locateObject(goldList[i], casinoScene, goldX[i], goldY);  // NEED TO REIVSE
+			}
+
+			showGold();
+
+		}
 
 		if (currentScene == tower3F_Scene && playerX >= 700 && playerX <= 800) { 
 
@@ -2150,8 +2803,38 @@ void keyboardCallback(KeyCode code, KeyState state) {
 			if (750 <= playerX and playerX <= 1050) {
 				rest();
 			}
-		}
 
+			else if (playerX > playerX_MAX - 100) {
+				currentScene = villageScene;
+
+				playerX = 50;
+				locateObject(player, currentScene, playerX, playerY_FIXED);
+
+				enterScene(currentScene);
+			}
+		}
+		
+		if (currentScene == villageScene) {
+			if ((200 < playerX) && (playerX < 300)) {
+				currentScene = storeScene;
+				enterScene(currentScene);
+				hideObject(player);
+
+				for (int i = 0; i < 3; i++) {
+					scaleObject(goldList[i], 0.8f);
+					locateObject(goldList[i], storeScene, goldX[i], goldY);  // NEED TO REIVSE
+				}
+
+				showGold();
+				showGold();
+			}
+			else if ((900 < playerX) && (playerX < 1000)) {
+				currentScene = tower3F_Scene;
+				enterScene(currentScene);
+				playerX = 50;
+				locateObject(player, currentScene, playerX, 200);
+			}
+		}
 		if (currentScene == tower5F_Scene) {
 			if (enemyTX_FIXED - 30 < playerX and playerX < enemyTX_FIXED + 100 and enemyTShown) {
 				currentScene = battle5F_Scene;
@@ -2289,24 +2972,31 @@ void keyboardCallback(KeyCode code, KeyState state) {
 
 	// 59: Escape key
 	else if (code == 59) {
-	if (currentScene == game6F_Scene) {
-		playerHp -= static_cast<int>(playerMaxHp * 0.1f);
-		for (int y = 0; y < 3; y++) {
-			for (int x = 0; x < 3; x++) {
-				hideObject(puzzleList[y][x].obj);
+		if (currentScene == game6F_Scene) {
+			playerHp -= static_cast<int>(playerMaxHp * 0.1f);
+			for (int y = 0; y < 3; y++) {
+				for (int x = 0; x < 3; x++) {
+					hideObject(puzzleList[y][x].obj);
+				}
 			}
+
+			// Player's hp can be 0
+			if (playerHp <= 0) {
+				// do something
+			}
+
+			currentScene = tower6F_Scene;
+			enterScene(tower6F_Scene);
 		}
 
-		// Player's hp can be 0
-		if (playerHp <= 0) {
-			// do something
+
+		if (currentScene == casinoScene) {
+			enterScene(villageLeftScene);
+			currentScene = villageLeftScene;
+
+
 		}
-
-		currentScene = tower6F_Scene;
-		enterScene(tower6F_Scene);
 	}
-	}
-
 
 }
 
@@ -2321,8 +3011,7 @@ int main() {
 	gameInit();
 	
 	// Starting a game
-
-	currentScene = tower4F_Scene; //revision! 
+	currentScene = villageLeftScene;
 	startGame(currentScene);
 
 }
