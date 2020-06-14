@@ -3032,7 +3032,7 @@ int main() {
 	gameInit();
 	
 	// Starting a game
-	currentScene = villageLeftScene;
+	currentScene = tower6F_Scene;
 	startGame(currentScene);
 
 }
