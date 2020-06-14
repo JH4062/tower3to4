@@ -3,6 +3,36 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <vector>
+
+// Enemy's attack
+class Attack1 {
+public:
+	ObjectID obj;
+	int x, y, dy;
+
+public:
+	Attack1(ObjectID obj, int x, int y, int dy) : obj(obj), x(x), y(y), dy(dy) {};
+};
+
+class Attack2 {
+public:
+	ObjectID left, right;
+	ObjectID rect;
+	int left_x, right_x, rect_x, y;
+	int time;
+	bool isRect;
+
+public:
+	Attack2(ObjectID left, ObjectID right, ObjectID rect, int y, int time) : left(left), right(right), rect(rect), y(y), time(time) {
+		left_x = 983;
+		right_x = 273;
+		rect_x = 333;
+		isRect = false;
+	};
+};
+
+
 
 // Animation for character's movement
 TimerID moveTimer;
@@ -13,6 +43,10 @@ const int MOVE_SPEED = 10;
 SceneID tower3F_Scene, battle3F_Scene, tower4F_Scene, game4F_Scene;
 ObjectID zombieT;
 ObjectID attack, item, avoid, zombieF, brain, explosion, blood[4], zomhand;
+SceneID gameOverScene;
+SceneID villageLeftScene;
+SceneID tower5F_Scene, battle5F_Scene;
+SceneID tower6F_Scene, game6F_Scene;
 
 SceneID currentScene;
 
@@ -25,8 +59,20 @@ TimerID frogSpawnTimer, frogFlyTimer0, frogFlyTimer1, frogFlyTimer2, spearTimer;
 
 // Sounds
 SoundID zom, explo, hand;
+SoundID hitSound;      // Player was hit.
+SoundID attackSound;   // Player attacked.
 
-// Player
+// Days
+int day = 1;
+const int DAY_LIMIT = 14;
+bool isNight = false;
+
+// Structures and messages
+ObjectID house;
+ObjectID messageObj;
+
+
+// Player 
 ObjectID player;
 int playerX, playerY;
 int dx, dy;
@@ -38,15 +84,92 @@ ObjectID playerIcon;
 ObjectID playerHpBar;
 int iconX, iconY;
 int iconDx, iconDy;
+
 const int iconX_MIN = 333, iconX_MAX = 943, iconX_SIZE = 40;
 const int iconY_MIN = 150, iconY_MAX = 320, iconY_SIZE = 70;
 const int playerHpBarX_FIXED = 333, playerHpBarY_FIXED = 50;
 
 int playerHp, playerMaxHp, playerAtk, playerDef;
 
+// Buttons
+ObjectID attackButton, itemButton, avoidButton;
+ObjectID outButton;
+const int buttonY_FIXED = 80;
+
+// Attack1
+int enemyAtt1Cnt = 0, enemyAtt1MaxCnt = 40;
+const int enemyAtt1StartCnt = 40;
+const int enemyAtt1Y_FIXED = 440;
+const int enemyAtt1X_SIZE = 34, enemyAtt1Y_SIZE = 30;
+
+// Attack2
+int enemyAtt2Cnt = 0, enemyAtt2MaxCnt = 10;
+const int enemyAtt2StartCnt = 10;
+const int enemyAtt2Time = 10;
+const int enemyAtt2X_SIZE = 650, enemyAtt2Y_SIZE = 34;
+int canMakeAtt2Cnt = 0;
+bool canMakeAtt2 = true;
+
+std::vector<Attack1> attacks1;
+std::vector<Attack2> attacks2;
+
+// Puzzle
+const int emptyNum = 4;
+
+class Puzzle {
+public:
+	ObjectID obj;
+	int x, y, num;
+
+public:
+	Puzzle() : x(0), y(0), num(0) {
+		obj = createObject("nothing");
+	}
+	Puzzle(int num, int x, int y) : x(x), y(y), num(num) {
+		char imageName[60];
+		sprintf_s(imageName, sizeof(imageName), "./Images/UI/Puzzle/Partitions2/%d.png", num);
+		obj = createObject(imageName);
+
+		locateObject(obj, game6F_Scene, x, y);
+	};
+
+public:
+	void changeImage(int num) {
+		this->num = num;
+
+		char imageName[60];
+		sprintf_s(imageName, sizeof(imageName), "./Images/UI/Puzzle/Partitions2/%d.png", num);
+		setObjectImage(this->obj, imageName);
+
+		if (this->num == emptyNum) {
+			hideObject(this->obj);
+		}
+		else {
+			showObject(this->obj);
+		}
+	}
+	void changeLocation(int x, int y) {
+		this->x = x;
+		this->y = y;
+
+		locateObject(this->obj, game6F_Scene, this->x, this->y);
+	}
+};
+
+int puzzleX[3] = { 375, 552, 729 };
+int puzzleY[3] = { 447, 270, 93 };
+Puzzle puzzleList[3][3];
+ObjectID puzzleT;
+bool puzzleTShown = true;
+const int puzzleTX_FIXED = 760, puzzleTY_FIXED = 200;
+
+// ====================================================================================
+
+
 // Location of zombie
 int zombieX[3] = { 600, 450, 750 };
 int zombieY = 400;
+int zombieFHp = 100, zombieFHpMax = 100;
 
 //  blood 
 int bloodX1 = 644;
@@ -69,14 +192,17 @@ int goldX[3] = { 1040, 1067, 1094 };
 int goldY = 595;
 
 //turn ========================================================
-TimerID turnTimer;
-int turnCnt = 0;
-const int TURN_TIME = 20;
-const Second TURN_TICK = 0.05f;
 
 // Const variable for turn
 const int PLAYER = 0;
 const int ENEMY = 1;
+
+// Animation for turn
+TimerID turnTimer;
+int turn = PLAYER;
+int turnCnt = 0;
+const int TURN_TIME = 20;
+const Second TURN_TICK = 0.05f;
 
 // ===============================================================
 
@@ -87,14 +213,34 @@ const int IMMUNE_TIME = 20;
 const Second IMMUNE_TICK = 0.05f;
 bool hitAlready = false;
 
+// Animation for enemy's attack
+TimerID enemyAtt1, enemyAtt2, enemyAtt3;
+TimerID enemyAtt2Maker;
+const Second ATTACK_TICK = 0.05f;
+int GRAVITY = 2;
+
+// Animation for message
+TimerID messageTimer;
+int messageCnt = 0;
+const int MESSAGE_TIME = 1;
+const Second MESSAGE_TICK = 1.0f;
+
+// Animation for game over
+TimerID gameOverTimer;
+int overCnt = 0;
+const int OVER_TIME = 1;
+const Second OVER_TICK = 1.0f;
+
 // Enemy
 ObjectID enemy;
+ObjectID enemyT;
 ObjectID enemyHpBar;
 int enemyX, enemyY;
 int enemyHp, enemyMaxHp, enemyAtk, enemyDef;
+bool enemyTShown = true;
 const int enemyY_FIXED = 410;
+const int enemyTX_FIXED = 850, enemyTY_FIXED = 200;
 const int enemyHpBarX_FIXED = 333, enemyHpBarY_FIXED = 660;
-
 // minigame4 ========================================================
 
 ObjectID miniGameMessage4;
@@ -151,19 +297,6 @@ bool isSpin = false; // is it spin?
 
 int slotX[3] = { 430, 580, 730 }; // the x of casino slot A, B, C
 
-// miniGame2 =======================================================================================
-
-TimerID bombDropTimer0, bombDropTimer1, bombDropTimer2, bombDropTimer3, bombDropTimer4;
-
-ObjectID playerCart, bomb[4];
-
-SceneID tower2F_Scene, game2F_Scene;
-
-int playerCartX = 300, playerCartDx = 0;
-int bombX[5] = { 50, 200, 350, 600, 750 };
-int bombY = 600;
-
-// ==========================================================================================
 
 // Functions
 void mouseCallback(ObjectID obj, int x, int y, MouseAction action);
@@ -173,6 +306,21 @@ void gameInit();
 void playerMove();
 void playerIconMove();
 void playerWingMove();
+
+void changeToNight(void);
+void rest(void);
+
+void battle(void);
+void enemyAttack(void);
+void enemyAttack1(void);
+void enemyAttack2(bool half);
+void enemyAttack3(void);
+
+void puzzleInit(void);
+bool isEnd(void);
+void isTouching(int x, int y);
+void puzzleEnd(void);
+
 void Turn();
 // casino
 int slotA();
@@ -193,18 +341,14 @@ void frogFly1();
 void frogFly2();
 void throwSpear();
 
-// minigame2
-void playerCartMove();
-void bombDrop();
-
 // ==================================================================================================================================================================
 
 void Turn() {
 	// Player Turn
 	if (turnNum % 2 == 0) {
-		showObject(attack);
-		showObject(item);
-		showObject(avoid);
+		showObject(attackButton);
+		showObject(itemButton);
+		showObject(avoidButton);
 	}
 	// Enemy Turn
 	else if (turnNum % 2 == 1) { // if it's com turn
@@ -271,13 +415,52 @@ void showGold(void) {
 //Setting elements needed to play game
 void gameInit() {
 
+	// setGameOption(GameOption::GAME_OPTION_ROOM_TITLE, false);
+	setGameOption(GameOption::GAME_OPTION_MESSAGE_BOX_BUTTON, false);
+
+	// Timers for turn, immune, and attacks
+	enemyAtt1 = createTimer(ATTACK_TICK);
+	enemyAtt2 = createTimer(ATTACK_TICK);
+	enemyAtt3 = createTimer(ATTACK_TICK);
+	enemyAtt2Maker = createTimer(ATTACK_TICK);
+	messageTimer = createTimer(MESSAGE_TICK);
+	gameOverTimer = createTimer(OVER_TICK);
+
+
 	// Scenes
 
-	game2F_Scene = createScene(" minigame2", "./Images/Backgrounds/Tower_Inside.png");
 	tower3F_Scene = createScene(" towerLevel3", "./Images/Backgrounds/Tower_Inside.png");
 	battle3F_Scene = createScene("zombie", "./Images/Backgrounds/Battle.png");
 	tower4F_Scene = createScene("towerLevel4", "./Images/Backgrounds/Tower_Inside.png");
 	game4F_Scene = createScene("minigame4", "./Images/Backgrounds/mini3Background.jpg");
+	tower5F_Scene = createScene("Tower - 5F", "./Images/Backgrounds/Tower_Inside.png");
+	battle5F_Scene = createScene("Black Knight", "./Images/Backgrounds/Battle.png");
+	tower6F_Scene = createScene("Tower - 6F", "./Images/Backgrounds/Tower_Inside.png");
+	game6F_Scene = createScene("Puzzle", "./Images/Backgrounds/Puzzle_6F.png");
+	villageLeftScene = createScene("Village", "./Images/Backgrounds/DayTime.png");
+	// REVISION currentScene =
+	
+		// Buttons
+	attackButton = createObject("./Images/UI/Battle/Attack.png");
+	locateObject(attackButton, battle5F_Scene, 310, buttonY_FIXED);
+	scaleObject(attackButton, 0.65f);
+	showObject(attackButton);
+
+	itemButton = createObject("./Images/UI/Battle/Item.png");
+	locateObject(itemButton, battle5F_Scene, 610, buttonY_FIXED);
+	scaleObject(itemButton, 0.65f);
+	showObject(itemButton);
+
+	avoidButton = createObject("./Images/UI/Battle/Avoid.png");
+	locateObject(avoidButton, battle5F_Scene, 890, buttonY_FIXED);
+	scaleObject(avoidButton, 0.65f);
+	showObject(avoidButton);
+
+	outButton = createObject("./Images/UI/Puzzle/OutButton.png");
+	locateObject(outButton, game6F_Scene, puzzleX[2] + 187, puzzleY[2] - 5);
+	showObject(outButton);
+
+
 
 	// ====================================================================
 
@@ -305,19 +488,41 @@ void gameInit() {
 
 	spearTimer = createTimer();
 
-	// Timer for minigame 2
-	bombDropTimer0 = createTimer();
-	bombDropTimer1 = createTimer();
-	bombDropTimer2 = createTimer();
-	bombDropTimer3 = createTimer();
-
-
 	// =====================================================================
 
 	// Sound effects
 	zom = createSound("./Audios/tower3/zombieWalk.mp3");
 	explo = createSound("./Audios/tower3/explosion.mp3");
 	hand = createSound("./Audios/tower3/zombieHand.mp3");
+	hitSound = createSound("./Audios/HitSound.wav");
+	attackSound = createSound("./Audios/AttackSound.wav");
+
+	// Enemy
+	enemy = createObject("./Images/Enemies/BlackKnight.png");
+	enemyX = 590;
+	enemyY = enemyY_FIXED;
+	enemyHp = 200;
+	enemyMaxHp = 200;
+	enemyAtk = 20;
+	enemyDef = 10;
+	locateObject(enemy, battle5F_Scene, enemyX, enemyY);
+	scaleObject(enemy, 0.15f);
+	showObject(enemy);
+
+	enemyT = createObject("./Images/Enemies/BlackKnight.png");
+	locateObject(enemyT, tower5F_Scene, enemyTX_FIXED, enemyTY_FIXED);
+	scaleObject(enemyT, 0.22f);
+	showObject(enemyT);
+
+	enemyHpBar = createObject("./Images/UI/Battle/Hp/Hp_100%.png");
+	locateObject(enemyHpBar, battle5F_Scene, enemyHpBarX_FIXED, enemyHpBarY_FIXED);
+	showObject(enemyHpBar);
+
+	// Puzzle
+	puzzleT = createObject("./Images/UI/Puzzle/DoorT.png");
+	locateObject(puzzleT, tower6F_Scene, puzzleTX_FIXED, puzzleTY_FIXED);
+	showObject(puzzleT);
+
 
 	// player
 	player = createObject("./Images/Characters/Warrior_R.png");
@@ -359,24 +564,6 @@ void gameInit() {
 	locateObject(playerIcon, battle3F_Scene, iconX, iconY);
 	showObject(playerIcon);
 
-	// attack
-	attack = createObject("./Images/UI/Battle/attack.png");
-	locateObject(attack, battle3F_Scene, 310, 80);
-	scaleObject(attack, 0.65f);
-	showObject(attack);
-
-	// item
-	item = createObject("./Images/UI/Battle/item.png");
-	locateObject(item, battle3F_Scene, 610, 80);
-	scaleObject(item, 0.65f);
-	showObject(item);
-
-	// avoid
-	avoid = createObject("./Images/UI/Battle/avoid.png");
-	locateObject(avoid, battle3F_Scene, 900, 80);
-	scaleObject(avoid, 0.6f);
-	showObject(avoid);
-
 	// brain
 	brain = createObject("./Images/Enemies/tower3/brain.png");
 
@@ -415,9 +602,9 @@ void gameInit() {
 
 	//playSound(bgm);  NEED TO REVISION :: when player enters casion, play this bgm
 
-	coin = createSound("./Audios/casino/coinEffect.wav"); 
+	coin = createSound("./Audios/casino/coinEffect.wav");
 
-	questionMark = createObject("./Images/Items/Casino/questionMark.png"); 
+	questionMark = createObject("./Images/Items/Casino/questionMark.png");
 
 	win = createSound("./Audios/casino/win.mp3"); // sound effect when the three images of fruit equal 
 
@@ -454,7 +641,7 @@ void gameInit() {
 	playerWing = createObject("./Images/Characters/flyingWarrior.png");
 	locateObject(playerWing, game4F_Scene, 100, 300);
 	showObject(playerWing);
-	
+
 	spear = createObject("./Images/Enemies/tower4/spear.png");
 
 	char frogImage[100];
@@ -467,25 +654,164 @@ void gameInit() {
 	for (int i = 0; i < 3; i++) {
 		sprintf_s(heartImage, "./Images/Enemies/tower4/H%d.png", i);
 		miniHeart[i] = createObject(heartImage);
-		locateObject(miniHeart[i], game4F_Scene, heartX[i],heartY);
+		locateObject(miniHeart[i], game4F_Scene, heartX[i], heartY);
 		showObject(miniHeart[i]);
 		scaleObject(miniHeart[i], 0.5f);
 	}
 
-	// minigame 2 =====================================================================
-	
-	playerCart = createObject("./Images/UI/MiniGame2/Cart.png");
-	locateObject(playerCart, game2F_Scene, playerCartX, playerY);
-	showObject(playerCart);
-	
-	char bombImage[100];
-	for (int i = 0; i < 4; i++) {
-		sprintf_s(bombImage, "./Images/UI/MiniGame2/Bomb_%d.png", i);
-		bomb[i] = createObject(bombImage);
-		locateObject(bomb[i], game2F_Scene, bombX[i], bombY);
-		showObject(bomb[i]);
+}
+void changeToNight(void) {
+	// Change a time to night.
+
+	if (not isNight) {
+		isNight = true;
+		setSceneImage(villageLeftScene, "./Images/Backgrounds/NightTime.png");
+		// setSceneImage(villageRightScene, "./Images/Backgrounds/NightTime.png");
+	}
+}
+
+void rest(void) {
+	// Change a day to tomorrow.
+
+	if (isNight) {
+		if (day < DAY_LIMIT) {
+			playerHp = playerMaxHp;
+			day += 1;
+
+			setSceneImage(villageLeftScene, "./Images/Backgrounds/DayTime.png");
+			// setSceneImage(villageRightScene, "./Images/Backgrounds/DayTime.png");
+			isNight = false;
+		}
+		else {
+			// At DAY_LIMIT, enter scene to game over.
+			// gameOverScene = createScene("game over", "./Images/Backgrounds/GameOver.jpg");
+			// enterScene(gameOverScene);
+			// overCnt = OVER_TIME;
+			// setTimer(gameOverTimer, OVER_TICK);
+			// startTimer(gameOverTimer);
+		}
+	}
+	else {
+		// If time is not a night, show message about using house.
+		ObjectID canNotRest = createObject("./Images/Messages/CanNotRest.png");
+		locateObject(canNotRest, villageLeftScene, 0, 0);
+		showObject(canNotRest);
+
+		// Using animations.
+		messageCnt = MESSAGE_TIME;
+		messageObj = canNotRest;
+		setTimer(messageTimer, MESSAGE_TICK);
+		startTimer(messageTimer);
+	}
+}
+
+// ====================================================================================
+
+void battle(void) {
+	// Start a battle.
+	// When battle ends: Player selects avoid, Player died, Enemy died.
+	if (turn == PLAYER) {
+		showObject(attackButton);
+		showObject(itemButton);
+		showObject(avoidButton);
+	}
+	else if (turn == ENEMY) {
+		enemyAttack();
+	}
+}
+
+void enemyAttack(void) {
+	int a1_min = 0, a1_max = 0;
+	int a2_min = 0, a2_max = 0;
+	int a3_min = 0, a3_max = 0;
+	if (0.75f < static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp)) {
+		a1_min = 1;
+		a1_max = 50;
+		a2_min = 51;
+		a2_max = 100;
+	}
+	else if (0.5f < static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp)) {
+		a1_min = 1;
+		a1_max = 40;
+		a2_min = 41;
+		a2_max = 80;
+		a3_min = 81;
+		a3_max = 100;
+	}
+	else if (0.25f < static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp)) {
+		a1_min = 1;
+		a1_max = 30;
+		a2_min = 31;
+		a2_max = 60;
+		a3_min = 61;
+		a3_max = 100;
+	}
+	else {
+		a3_min = 1;
+		a3_max = 100;
 	}
 
+	int strategy = rand() % 100 + 1;
+	if (a1_min <= strategy and strategy <= a1_max) {
+		enemyAttack1();
+
+		turn = PLAYER;
+		turnCnt = TURN_TIME * 5;
+		setTimer(turnTimer, TURN_TICK);
+		startTimer(turnTimer);
+	}
+	else if (a2_min <= strategy and strategy <= a2_max) {
+		enemyAttack2(false);
+
+		turn = PLAYER;
+		turnCnt = TURN_TIME * 10;
+		setTimer(turnTimer, TURN_TICK);
+		startTimer(turnTimer);
+	}
+	else if (a3_min <= strategy and strategy <= a3_max) {
+		enemyAttack3();
+
+		turn = PLAYER;
+		turnCnt = TURN_TIME * 6;
+		setTimer(turnTimer, TURN_TICK);
+		startTimer(turnTimer);
+	}
+}
+
+void enemyAttack1(void) {
+	if (0.5f < static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp)) {
+		enemyAtt1MaxCnt = enemyAtt1StartCnt;
+	}
+	else if (0.25f < static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp)) {
+		enemyAtt1MaxCnt = static_cast<int>(enemyAtt1StartCnt * 1.5f);
+	}
+	else {
+		enemyAtt1MaxCnt = enemyAtt1StartCnt * 2;
+	}
+
+	enemyAtt1Cnt = enemyAtt1MaxCnt;
+
+	setTimer(enemyAtt1, ATTACK_TICK);
+	startTimer(enemyAtt1);
+}
+
+void enemyAttack2(bool half) {
+	if (half) {
+		enemyAtt2MaxCnt = static_cast<int>(enemyAtt2StartCnt * 0.5f);
+	}
+	else {
+		enemyAtt2MaxCnt = enemyAtt2StartCnt;
+	}
+
+	enemyAtt2Cnt = enemyAtt2MaxCnt;
+
+	setTimer(enemyAtt2, ATTACK_TICK);
+	startTimer(enemyAtt2);
+}
+
+void enemyAttack3(void) {
+	enemyAttack1();
+	enemyAttack2(true);
 }
 
 bool checkCollision(ObjectID object, int xStart, int xEnd, int yStart, int yEnd) {
@@ -516,6 +842,115 @@ bool checkCollision(ObjectID object, int xStart, int xEnd, int yStart, int yEnd)
 	}
 
 
+}
+
+// ====================================================================================
+
+void puzzleInit(void) {
+	Puzzle puzzleTempList[9];
+	for (int i = 0; i < 9; i++) {
+		puzzleTempList[i] = Puzzle(i, puzzleX[i % 3], puzzleY[i / 3]);
+		if (i == emptyNum) {
+			hideObject(puzzleTempList[i].obj);
+		}
+		else {
+			showObject(puzzleTempList[i].obj);
+		}
+	}
+
+	bool already[9] = { false };
+	int puzzleRandomNum[9] = { 0 };
+	int index = 0;
+	while (index != 9) {
+		int temp = rand() % 9;
+
+		if (!already[temp]) {
+			puzzleRandomNum[index++] = temp;
+			already[temp] = true;
+		}
+	}
+	index = 0;
+
+	/*
+	// Use it for check answer.
+	// If you want to use it, you have to comment up-lines (bool already ~ index = 0;)
+	int puzzleRandomNum[9] = { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
+	int index = 0;
+	*/
+
+	for (int y = 0; y < 3; y++) {
+		for (int x = 0; x < 3; x++) {
+			puzzleList[y][x] = puzzleTempList[puzzleRandomNum[index++]];
+			puzzleList[y][x].changeLocation(puzzleX[x], puzzleY[y]);
+		}
+	}
+}
+
+bool isEnd(void) {
+	int index = 0;
+
+	for (int y = 0; y < 3; y++) {
+		for (int x = 0; x < 3; x++) {
+			if (puzzleList[y][x].num == index) index += 1;
+			else return false;
+		}
+	}
+	return true;
+}
+
+void isTouching(int x, int y) {
+	if (puzzleList[y][x].num == emptyNum) {
+		return;
+	}
+
+	if (0 <= x - 1) {
+		if (puzzleList[y][x - 1].num == emptyNum) {
+			puzzleList[y][x - 1].changeImage(puzzleList[y][x].num);
+			puzzleList[y][x].changeImage(emptyNum);
+
+			if (isEnd()) {
+				puzzleEnd();
+			}
+		}
+	}
+	if (x + 1 <= 2) {
+		if (puzzleList[y][x + 1].num == emptyNum) {
+			puzzleList[y][x + 1].changeImage(puzzleList[y][x].num);
+			puzzleList[y][x].changeImage(emptyNum);
+
+			if (isEnd()) {
+				puzzleEnd();
+			}
+		}
+	}
+	if (0 <= y - 1) {
+		if (puzzleList[y - 1][x].num == emptyNum) {
+			puzzleList[y - 1][x].changeImage(puzzleList[y][x].num);
+			puzzleList[y][x].changeImage(emptyNum);
+
+			if (isEnd()) {
+				puzzleEnd();
+			}
+		}
+	}
+	if (y + 1 <= 2) {
+		if (puzzleList[y + 1][x].num == emptyNum) {
+			puzzleList[y + 1][x].changeImage(puzzleList[y][x].num);
+			puzzleList[y][x].changeImage(emptyNum);
+
+			if (isEnd()) {
+				puzzleEnd();
+			}
+		}
+	}
+}
+
+void puzzleEnd(void) {
+	setObjectImage(puzzleT, "./Images/UI/Puzzle/DoorT_Open.png");
+	puzzleTShown = false;
+
+	currentScene = tower6F_Scene;
+	enterScene(currentScene);
 }
 
 void playerMove(void) {
@@ -633,27 +1068,6 @@ void playerWingMove(void) {
 
 }
 
-//minigame2
-void playerCartMove(void) {
-
-	playerCartX += playerCartDx;
-
-	// Set a restriction.
-	/*
-	if (playerCartX < playerX_MIN) {
-		playerCartX = playerX_MIN;
-	}
-	else if (playerCartX > playerX_MAX) {
-		playerCartX = playerX_MAX;
-	}
-	*/
-
-	locateObject(playerCart, game2F_Scene, playerCartX, playerY);
-
-	setTimer(moveTimer, MOVE_TICK);
-	startTimer(moveTimer);
-}
-
 void checkHp(int kind) {
 	// Check object's Hp and change Hp bar with their Hp percent.
 
@@ -664,7 +1078,12 @@ void checkHp(int kind) {
 		hpBar = playerHpBar;
 	}
 	else if (kind == ENEMY) {
-		hpPercent = static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp);
+		if (currentScene == battle3F_Scene) {
+			hpPercent = static_cast<float>(zombieFHp) / static_cast<float>(zombieFHpMax);
+		}
+		else if (currentScene == battle5F_Scene) {
+			hpPercent = static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp);
+		}
 		hpBar = enemyHpBar;
 	}
 
@@ -796,6 +1215,7 @@ void roulette() {
 void randAtt() {
 
 	repeatNum = 0; //reset repeatNumber
+	
 
 	srand((unsigned int)time(NULL));
 	int num = rand() % 3;
@@ -848,7 +1268,8 @@ void zombieAtt0() {
 		setTimer(immuneTimer, IMMUNE_TICK);
 		startTimer(immuneTimer);
 
-		playerHp -= 20; // NEED TO REVISE
+		playerHp -= 20;
+
 		checkHp(PLAYER);
 	}
 }
@@ -1180,61 +1601,118 @@ void throwSpear() {
 
 // ========================================================================================================
 
-void bombDrop(){
-	
-	bombY -= 30;
-	
-	for (int i = 0; i < 4; i++) {
-	locateObject(bomb[i], game2F_Scene, bombX[i], bombY);
-	}
-
-	setTimer(bombDropTimer0, MOVE_TICK);
-	startTimer(bombDropTimer0);
-	
-	setTimer(bombDropTimer1, MOVE_TICK);
-	startTimer(bombDropTimer1);
-							  
-	setTimer(bombDropTimer2, MOVE_TICK);
-	startTimer(bombDropTimer2);
-							  
-	setTimer(bombDropTimer3, MOVE_TICK);
-	startTimer(bombDropTimer3);
-
-	}
-
-// ========================================================================================================
 
 void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 	
 
-	// If player clicked attack, then player attacks zombie as much as weapon's level
-	if (object == attack) {
-		enemyHp -= 20; // NEED TO REVISE!
+	if (object == attackButton) {
+
+		enemyHp -= (playerAtk - enemyDef > 0 ? playerAtk - enemyDef : 1);
+		playSound(attackSound);
+		checkHp(ENEMY);
+		
+		hideObject(attackButton);
+		hideObject(itemButton);
+		hideObject(avoidButton);
+
+		if (currentScene == battle5F_Scene) {
+			turn = ENEMY;
+			turnCnt = TURN_TIME;
+			setTimer(turnTimer, TURN_TICK);
+			startTimer(turnTimer);
+		}
+
+		else if (currentScene == battle3F_Scene) {
+			zombieFHp -= 20;
+			turnNum += 1;
+			turnCnt = TURN_TIME;
+			setTimer(turnTimer, TURN_TICK);
+			startTimer(turnTimer);
+		}
+		
+		if (enemyHp <= 0 and currentScene == battle5F_Scene) {
+			enemyTShown = false;
+			hideObject(enemyT);
+
+			currentScene = tower5F_Scene;
+			enterScene(tower5F_Scene);
+		}
+
+		if (zombieFHp <= 0 and currentScene == battle3F_Scene) {
+			enemyShown = false;
+			hideObject(zombieT);
+
+			currentScene = tower3F_Scene;
+			enterScene(tower3F_Scene);
+
+		}
+
+		else {
+			turn = ENEMY;
+			turnCnt = TURN_TIME;
+			setTimer(turnTimer, TURN_TICK);
+			startTimer(turnTimer);
+		}
+	}
+	else if (object == itemButton) {
+		// do something with item.
+	}
+	else if (object == avoidButton) {
+		enemyHp = enemyMaxHp;
 		checkHp(ENEMY);
 
-		hideObject(attack);
-		hideObject(item);
-		hideObject(avoid);
+		hideObject(attackButton);
+		hideObject(itemButton);
+		hideObject(avoidButton);
 
-		turnNum += 1;
-		turnCnt = TURN_TIME;
-		setTimer(turnTimer, TURN_TICK);
-		startTimer(turnTimer);
+		enterScene(villageLeftScene);
+		currentScene = villageLeftScene;
 	}
 
-	if (object == item) {
+	// Puzzles
+	else if (object == outButton) {
+		playerHp -= static_cast<int>(playerMaxHp * 0.1f);
+		for (int y = 0; y < 3; y++) {
+			for (int x = 0; x < 3; x++) {
+				hideObject(puzzleList[y][x].obj);
+			}
+		}
 
+		// Player's hp can be 0
+		if (playerHp <= 0) {
+			// do something
+		}
+
+		currentScene = tower6F_Scene;
+		enterScene(tower6F_Scene);
 	}
-
-	// If player clicked avoid, then player goes back to towerInside3
-	if (object == avoid) {
-		enterScene(tower3F_Scene);// revision! :: currentScene = where?
-		
-		
-		turnCnt = 0;
-		turnNum = 0;
+	else if (object == puzzleList[0][0].obj) {
+		isTouching(0, 0);
 	}
-
+	else if (object == puzzleList[0][1].obj) {
+		isTouching(1, 0);
+	}
+	else if (object == puzzleList[0][2].obj) {
+		isTouching(2, 0);
+	}
+	else if (object == puzzleList[1][0].obj) {
+		isTouching(0, 1);
+	}
+	else if (object == puzzleList[1][1].obj) {
+		isTouching(1, 1);
+	}
+	else if (object == puzzleList[1][2].obj) {
+		isTouching(2, 1);
+	}
+	else if (object == puzzleList[2][0].obj) {
+		isTouching(0, 2);
+	}
+	else if (object == puzzleList[2][1].obj) {
+		isTouching(1, 2);
+	}
+	else if (object == puzzleList[2][2].obj) {
+		isTouching(2, 2);
+	}
 	else if (object == miniGameMessage4) {
 
 		frogKill = 0;
@@ -1253,47 +1731,66 @@ void timerCallback(TimerID timer) {
 
 	if (timer == moveTimer) {
 
-		if (currentScene == tower3F_Scene || currentScene == tower4F_Scene) {
+		if (currentScene == villageLeftScene or currentScene == tower3F_Scene || currentScene == tower4F_Scene || currentScene == tower5F_Scene or currentScene == tower6F_Scene) {
 			playerMove();
 		}
 
-		else if (currentScene == battle3F_Scene) {
+		else if (currentScene == battle3F_Scene or currentScene == battle5F_Scene) {
 			playerIconMove();
 		}
 		else if (currentScene == game4F_Scene) {
 			playerWingMove();
+
 		}
 
-		else if (currentScene == game2F_Scene) {
-			playerCartMove();
+		else if (currentScene == game6F_Scene) {
+			setTimer(moveTimer, MOVE_TICK);
+			startTimer(moveTimer);
 		}
 
 	}
-	
-	
 
 	if (timer == casinoTimer) {
 		spin();
 	}
 
+
 	if (timer == turnTimer) {
-		// Make a turn.
-		if (turnCnt > 0) {
-			turnCnt -= 1;
+		if (currentScene == battle3F_Scene) {
 
-			setTimer(turnTimer, TURN_TICK);
-			startTimer(turnTimer);
-		}
-		else {
-			if (turnNum % 2 == 0) {
-				printf("TimerCallback: Turn() - Player \n");
+
+			// Make a turn.
+			if (turnCnt > 0) {
+				turnCnt -= 1;
+
+				setTimer(turnTimer, TURN_TICK);
+				startTimer(turnTimer);
 			}
-			else if (turnNum % 2 == 1) {
-				printf("TimerCallback: Turn() - Enemy \n");
+			else {
+				if (turnNum == 0) {
+					printf("TimerCallback: Turn() - Player \n");
+				}
+				else if (turnNum % 2 == 1) {
+					printf("TimerCallback: Turn() - Enemy \n");
+				}
+
+				Turn();
 			}
 
-			Turn();
 		}
+
+		else if (currentScene == battle5F_Scene) {
+			if (turnCnt > 0) {
+				turnCnt -= 1;
+
+				setTimer(turnTimer, TURN_TICK);
+				startTimer(turnTimer);
+			}
+			else {
+				battle();
+			}
+		}
+	
 	}
 
 	if (timer == immuneTimer) {
@@ -1401,6 +1898,183 @@ void timerCallback(TimerID timer) {
 		throwSpear();
 	}
 
+	else if (timer == messageTimer) {
+		if (messageCnt > 0) {
+			messageCnt -= 1;
+
+			if (messageCnt == 0) {
+				hideObject(messageObj);
+			}
+
+			setTimer(messageTimer, MESSAGE_TICK);
+			startTimer(messageTimer);
+		}
+	}
+	else if (timer == gameOverTimer) {
+		if (overCnt > 0) {
+			overCnt -= 1;
+
+			if (overCnt == 0) {
+				endGame();
+			}
+		}
+	}
+	
+	else if (timer == enemyAtt1) {
+		if (enemyAtt1Cnt > 0) {
+			attacks1.push_back(Attack1(createObject("./Images/Enemies/Att_Down.png"), iconX, enemyAtt1Y_FIXED, 0));
+
+			enemyAtt1Cnt -= 1;
+		}
+
+		int erased = 0;
+		for (int i = 0; i < (enemyAtt1MaxCnt - enemyAtt1Cnt); i++) {
+			if (0.5f < static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp)) {
+				attacks1[i].dy -= GRAVITY;
+			}
+			else if (0.25f < static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp)) {
+				attacks1[i].dy -= static_cast<int>(GRAVITY * 1.5f);
+			}
+			else {
+				attacks1[i].dy -= GRAVITY * 2;
+			}
+
+			attacks1[i].y += attacks1[i].dy;
+
+			if (attacks1[i].y < 100) {
+				hideObject(attacks1[i].obj);
+				erased += 1;
+			}
+			else {
+				locateObject(attacks1[i].obj, battle5F_Scene, attacks1[i].x, attacks1[i].y);
+				showObject(attacks1[i].obj);
+
+				if (checkCollision(playerIcon, attacks1[i].x + 3, attacks1[i].x + 3 + enemyAtt1X_SIZE, attacks1[i].y, attacks1[i].y + enemyAtt1Y_SIZE) and not hitAlready) {
+					playerHp -= (enemyAtk - playerDef > 0 ? enemyAtk - playerDef : 1);
+					playSound(hitSound);
+					checkHp(PLAYER);
+
+					if (playerHp <= 0) {
+						// Player died (Not Implemented)
+
+					}
+
+					hitAlready = true;
+					immuneCnt = IMMUNE_TIME;
+					setTimer(immuneTimer, IMMUNE_TICK);
+					startTimer(immuneTimer);
+				}
+			}
+		}
+
+		if (enemyAtt1Cnt != 0) {
+			setTimer(enemyAtt1, ATTACK_TICK);
+			startTimer(enemyAtt1);
+		}
+		else {
+			if (erased != enemyAtt1MaxCnt) {
+				setTimer(enemyAtt1, ATTACK_TICK);
+				startTimer(enemyAtt1);
+			}
+			else {
+				attacks1.clear();
+			}
+		}
+	}
+	else if (timer == enemyAtt2) {
+		if (enemyAtt2Cnt > 0 and canMakeAtt2) {
+			ObjectID left = createObject("./Images/Enemies/Att_Left.png");
+			ObjectID right = createObject("./Images/Enemies/Att_Right.png");
+			ObjectID rect = createObject("./Images/Enemies/Att_Rect.png");
+
+			attacks2.push_back(Attack2(left, right, rect, iconY + 15, enemyAtt2Time));
+			enemyAtt2Cnt -= 1;
+
+			canMakeAtt2 = false;
+			if (static_cast<float>(enemyHp) / static_cast<float>(enemyMaxHp) < 0.5f) {
+				canMakeAtt2Cnt = static_cast<int>(enemyAtt2Time * 1.2f);
+			}
+			else {
+				canMakeAtt2Cnt = static_cast<int>(enemyAtt2Time * 1.5f);
+			}
+			setTimer(enemyAtt2Maker, ATTACK_TICK);
+			startTimer(enemyAtt2Maker);
+		}
+
+		int erased = 0;
+		for (int i = 0; i < (enemyAtt2MaxCnt - enemyAtt2Cnt); i++) {
+			if (not attacks2[i].isRect) {
+				locateObject(attacks2[i].left, battle5F_Scene, attacks2[i].left_x, attacks2[i].y);
+				locateObject(attacks2[i].right, battle5F_Scene, attacks2[i].right_x, attacks2[i].y);
+				showObject(attacks2[i].left);
+				showObject(attacks2[i].right);
+
+				if (attacks2[i].time >= 0) {
+					attacks2[i].time -= 1;
+				}
+				else {
+					attacks2[i].time = enemyAtt2Time;
+					attacks2[i].isRect = true;
+				}
+			}
+			else {
+				locateObject(attacks2[i].rect, battle5F_Scene, attacks2[i].rect_x, attacks2[i].y);
+				showObject(attacks2[i].rect);
+				hideObject(attacks2[i].left);
+				hideObject(attacks2[i].right);
+
+				if (attacks2[i].time >= 0) {
+					attacks2[i].time -= 1;
+
+					if (checkCollision(playerIcon, attacks2[i].rect_x, attacks2[i].rect_x + enemyAtt2X_SIZE, attacks2[i].y, attacks2[i].y + enemyAtt2Y_SIZE) and not hitAlready) {
+						playerHp -= (enemyAtk - playerDef > 0 ? enemyAtk - playerDef : 1);
+						playSound(hitSound);
+						checkHp(PLAYER);
+
+						if (playerHp <= 0) {
+							// Player died (Not Implemented)
+
+						}
+
+						hitAlready = true;
+						immuneCnt = IMMUNE_TIME;
+						setTimer(immuneTimer, IMMUNE_TICK);
+						startTimer(immuneTimer);
+					}
+				}
+				else {
+					hideObject(attacks2[i].rect);
+					erased += 1;
+				}
+			}
+		}
+
+		if (enemyAtt2Cnt != 0) {
+			setTimer(enemyAtt2, ATTACK_TICK);
+			startTimer(enemyAtt2);
+		}
+		else {
+			if (erased != enemyAtt2MaxCnt) {
+				setTimer(enemyAtt2, ATTACK_TICK);
+				startTimer(enemyAtt2);
+			}
+			else {
+				attacks2.clear();
+			}
+		}
+	}
+	else if (timer == enemyAtt2Maker) {
+		if (canMakeAtt2Cnt > 0) {
+			canMakeAtt2Cnt -= 1;
+
+			setTimer(enemyAtt2Maker, ATTACK_TICK);
+			startTimer(enemyAtt2Maker);
+		}
+		else {
+			canMakeAtt2 = true;
+		}
+	}
+
 
 	//=======================================================================================
 }
@@ -1412,12 +2086,12 @@ void keyboardCallback(KeyCode code, KeyState state) {
 	if (code == 83) {				// RIGHT
 
 		
-		if (currentScene == tower3F_Scene || currentScene == tower4F_Scene) {
+		if (currentScene == tower3F_Scene || currentScene == tower4F_Scene or currentScene == tower5F_Scene or currentScene == tower6F_Scene) {
 			dx += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 
 		}
 
-		if (currentScene == battle3F_Scene) {
+		if (currentScene == battle3F_Scene or currentScene == battle5F_Scene) {
 			iconDx += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 		
@@ -1425,21 +2099,18 @@ void keyboardCallback(KeyCode code, KeyState state) {
 			playerWingDx += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 
-		if (currentScene == game2F_Scene) {
-			playerCartDx += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
-		}
-
+	
 		
 	}
 
 	else if (code == 82) {			//LEFT
 
-		if (currentScene == tower3F_Scene || currentScene == tower4F_Scene) {
+		if (currentScene == tower3F_Scene || currentScene == tower4F_Scene or currentScene == tower5F_Scene or currentScene == tower6F_Scene) {
 			dx -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 
 		}
 
-		if (currentScene == battle3F_Scene) {
+		if (currentScene == battle3F_Scene or currentScene == battle5F_Scene) {
 			iconDx -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 
@@ -1447,18 +2118,101 @@ void keyboardCallback(KeyCode code, KeyState state) {
 			playerWingDx -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 
-		if (currentScene == game2F_Scene) {
-			playerCartDx -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
-		}
-
 	}
 
 	else if (code == 84) {			// UP
 
-		if (currentScene == tower3F_Scene && playerX >= 750) { 
+		if (currentScene == tower3F_Scene && playerX >= 700 && playerX <= 800) { 
+
+			attackButton = createObject("./Images/UI/Battle/Attack.png");
+			locateObject(attackButton, battle3F_Scene, 310, buttonY_FIXED);
+			scaleObject(attackButton, 0.65f);
+			showObject(attackButton);
+
+			itemButton = createObject("./Images/UI/Battle/Item.png");
+			locateObject(itemButton, battle3F_Scene, 610, buttonY_FIXED);
+			scaleObject(itemButton, 0.65f);
+			showObject(itemButton);
+
+			avoidButton = createObject("./Images/UI/Battle/Avoid.png");
+			locateObject(avoidButton, battle3F_Scene, 890, buttonY_FIXED);
+			scaleObject(avoidButton, 0.65f);
+			showObject(avoidButton);
+
+
 			currentScene = battle3F_Scene;
 			enterScene(battle3F_Scene);
 						
+		}
+
+		// If current scene is tower and player can battle, then change a scene.
+		if (currentScene == villageLeftScene) {
+			if (750 <= playerX and playerX <= 1050) {
+				rest();
+			}
+		}
+
+		if (currentScene == tower5F_Scene) {
+			if (enemyTX_FIXED - 30 < playerX and playerX < enemyTX_FIXED + 100 and enemyTShown) {
+				currentScene = battle5F_Scene;
+				enterScene(currentScene);
+
+				locateObject(playerHpBar, battle5F_Scene, playerHpBarX_FIXED, playerHpBarY_FIXED);
+				showObject(playerHpBar);
+
+				dx = 0;
+				iconDx = 0;
+				iconDy = 0;
+
+				battle();
+			}
+			else if (playerX > playerX_MAX - 100 and not enemyTShown) {
+				currentScene = tower6F_Scene;
+
+				playerX = 50;
+				locateObject(player, currentScene, playerX, playerY_FIXED);
+
+				enterScene(currentScene);
+			}
+		}
+
+		if (currentScene == tower3F_Scene) {
+
+			if (playerX > playerX_MAX - 100 and not enemyShown) {
+				currentScene = tower4F_Scene;
+				enemyShown = true;
+
+				playerX = 50;
+				locateObject(player, currentScene, playerX, playerY_FIXED);
+
+				enterScene(currentScene);
+			}
+
+		}
+		
+
+		// Else if current scene is battle, then player move to upper direction.
+		else if (currentScene == battle5F_Scene) {
+			iconDy = MOVE_SPEED;
+			iconDy += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
+		}
+		else if (currentScene == tower6F_Scene) {
+			if (puzzleTX_FIXED - 30 < playerX and playerX < puzzleTX_FIXED + 300 and puzzleTShown) {
+				currentScene = game6F_Scene;
+				enterScene(currentScene);
+
+				dx = 0;
+
+				puzzleInit();
+			}
+			else if (puzzleTX_FIXED - 30 < playerX and playerX < puzzleTX_FIXED + 300 and not puzzleTShown) {
+				// currentScene = tower7F_Scene;
+
+				// playerX = 50;
+				// locateObject(player, currentScene, playerX, playerY_FIXED);
+
+				// enterScene(currentScene);
+			}
 		}
 
 		if (currentScene == battle3F_Scene) {
@@ -1477,8 +2231,20 @@ void keyboardCallback(KeyCode code, KeyState state) {
 
 			currentScene = game4F_Scene;
 			enterScene(game4F_Scene);
+
 			
 		}
+
+		if (currentScene == tower4F_Scene && playerX > playerX_MAX - 100 and not enemyShown) {
+			currentScene = tower5F_Scene;
+
+			playerX = 50;
+			locateObject(player, currentScene, playerX, playerY_FIXED);
+
+			enterScene(currentScene);
+		}
+
+		
 
 		if (currentScene == game4F_Scene) {
 			playerWingDy += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
@@ -1488,7 +2254,7 @@ void keyboardCallback(KeyCode code, KeyState state) {
 
 	else if (code == 85) {		// DOWN
 
-		if (currentScene == battle3F_Scene) {
+		if (currentScene == battle3F_Scene or currentScene == battle5F_Scene) {
 			iconDy -= (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
 		}
 
@@ -1521,6 +2287,27 @@ void keyboardCallback(KeyCode code, KeyState state) {
 		
 	}
 
+	// 59: Escape key
+	else if (code == 59) {
+	if (currentScene == game6F_Scene) {
+		playerHp -= static_cast<int>(playerMaxHp * 0.1f);
+		for (int y = 0; y < 3; y++) {
+			for (int x = 0; x < 3; x++) {
+				hideObject(puzzleList[y][x].obj);
+			}
+		}
+
+		// Player's hp can be 0
+		if (playerHp <= 0) {
+			// do something
+		}
+
+		currentScene = tower6F_Scene;
+		enterScene(tower6F_Scene);
+	}
+	}
+
+
 }
 
 int main() {
@@ -1535,10 +2322,7 @@ int main() {
 	
 	// Starting a game
 
-	enemyHp = 100;
-	enemyMaxHp = 100;
-
-	currentScene = game2F_Scene; //revision! 
+	currentScene = tower4F_Scene; //revision! 
 	startGame(currentScene);
 
 }
