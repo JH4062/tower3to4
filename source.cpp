@@ -1412,6 +1412,7 @@ void checkHp(int kind) {
 	else {
 		// HP is 0, so we have to do something at here.
 		setObjectImage(hpBar, "./Images/UI/Battle/Hp/Hp_0%.png");
+		
 	}
 }
 
@@ -1915,8 +1916,8 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 	}
 	
 	if (object == attackButton) {
-
-		enemyHp -= (playerAtk - enemyDef > 0 ? playerAtk - enemyDef : 1);
+	
+	
 		playSound(attackSound);
 		checkHp(ENEMY);
 
@@ -1925,10 +1926,29 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 		hideObject(avoidButton);
 
 		if (currentScene == battle5F_Scene) {
+			enemyHp -= (playerAtk - enemyDef > 0 ? playerAtk - enemyDef : 1);
 			turn = ENEMY;
 			turnCnt = TURN_TIME;
 			setTimer(turnTimer, TURN_TICK);
 			startTimer(turnTimer);
+
+			if (enemyHp <= 0 and currentScene == battle5F_Scene) {
+				enemyTShown = false;
+				hideObject(enemyT);
+
+				gold += 100;
+
+				currentScene = tower5F_Scene;
+				enterScene(tower5F_Scene);
+			}
+
+
+			else {
+				turn = ENEMY;
+				turnCnt = TURN_TIME;
+				setTimer(turnTimer, TURN_TICK);
+				startTimer(turnTimer);
+			}
 		}
 
 		else if (currentScene == battle3F_Scene) {
@@ -1939,17 +1959,10 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 			startTimer(turnTimer);
 		}
 
-		if (enemyHp <= 0 and currentScene == battle5F_Scene) {
-			enemyTShown = false;
-			hideObject(enemyT);
-
-			gold += 100;
-
-			currentScene = tower5F_Scene;
-			enterScene(tower5F_Scene);
-		}
+		
 
 		if (zombieFHp <= 0 and currentScene == battle3F_Scene) {
+			showMessage("처치 성공!!");
 			enemyShown = false;
 			hideObject(zombieT);
 
@@ -1960,12 +1973,6 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 
 		}
 
-		else {
-			turn = ENEMY;
-			turnCnt = TURN_TIME;
-			setTimer(turnTimer, TURN_TICK);
-			startTimer(turnTimer);
-		}
 	}
 	
 	else if (object == itemButton) {
@@ -2040,6 +2047,7 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 
 		hideObject(miniGameMessage4);
 	}
+
 	//store
 	else if (currentScene = storeScene) {
 		if (object == backToTown) {
@@ -2090,12 +2098,14 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 		hideObject(item3);
 		hideObject(item8);
 		hideObject(item9);
+
 		for (int i = 7; i < 10; i++) {
 			
 			hideObject(soldOut[i]);
 			hideObject(box[i]);
 			hideObject(price[i]);
 		}
+
 		for (int i = 4; i < 7; i++) {
 			showObject(box[i]);
 			if (soldOuted[i] == true) {
@@ -2103,6 +2113,7 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 			}
 			showObject(price[i]);
 		}
+
 		showObject(item4);
 		showObject(item5);
 		showObject(item6);
@@ -2110,6 +2121,7 @@ void mouseCallback(ObjectID object, int x, int y, MouseAction action) {
 		hideObject(storeRightArrow);
 		hideObject(storeLeftArrow);
 	}
+
 	else if (object == storeList3) {
 		for (int i = 0; i < 8; i++) {
 			hideObject(soldOut[i]);
@@ -2383,7 +2395,7 @@ void timerCallback(TimerID timer) {
 
 		}
 
-		else if (currentScene == game6F_Scene or currentScene == storeScene or currentScene == casinoScene) {
+		else if (currentScene == game6F_Scene or currentScene == storeScene or currentScene == casinoScene or currentScene == tower5F_Scene) {
 			setTimer(moveTimer, MOVE_TICK);
 			startTimer(moveTimer);
 		}
@@ -2513,6 +2525,8 @@ void timerCallback(TimerID timer) {
 
 			hideObject(frogT);
 			enemyShown = false;
+
+			showMessage("성공!!");
 
 			currentScene = tower4F_Scene;
 			enterScene(tower4F_Scene);
@@ -2765,6 +2779,7 @@ void keyboardCallback(KeyCode code, KeyState state) {
 		if (currentScene == villageLeftScene && playerX >= 170 && playerX <= 270) {
 			enterScene(casinoScene);
 			currentScene = casinoScene;
+			showMessage("게임비용은 1원 입니다. 스페이스를 눌러 룰렛을 작동시키세요. esc키를 누르면 나갈 수 있어요.");
 
 			for (int i = 0; i < 3; i++) {
 				scaleObject(goldList[i], 0.8f);
@@ -2791,6 +2806,9 @@ void keyboardCallback(KeyCode code, KeyState state) {
 			locateObject(avoidButton, battle3F_Scene, 890, buttonY_FIXED);
 			scaleObject(avoidButton, 0.65f);
 			showObject(avoidButton);
+
+			locateObject(playerHpBar, battle3F_Scene, playerHpBarX_FIXED, playerHpBarY_FIXED);
+			showObject(playerHpBar);
 
 
 			currentScene = battle3F_Scene;
@@ -2833,6 +2851,7 @@ void keyboardCallback(KeyCode code, KeyState state) {
 				enterScene(currentScene);
 				playerX = 50;
 				locateObject(player, currentScene, playerX, 200);
+				showObject(playerHpBar);
 			}
 		}
 		if (currentScene == tower5F_Scene) {
@@ -2905,6 +2924,8 @@ void keyboardCallback(KeyCode code, KeyState state) {
 
 		if (enemyShown == true && currentScene == tower4F_Scene && playerX >= 750) {
 			
+			playerWingX = 100;
+			playerWingY = 300;
 			// in case player tries minigame again
 			showObject(miniGameMessage4);
 			stopTimer(frogSpawnTimer);
@@ -2912,6 +2933,7 @@ void keyboardCallback(KeyCode code, KeyState state) {
 			stopTimer(frogFlyTimer1);
 			stopTimer(frogFlyTimer2);
 
+			showMessage("스페이스바를 누르면 창을 던져요");
 			currentScene = game4F_Scene;
 			enterScene(game4F_Scene);
 
@@ -2927,7 +2949,6 @@ void keyboardCallback(KeyCode code, KeyState state) {
 			enterScene(currentScene);
 		}
 
-		
 
 		if (currentScene == game4F_Scene) {
 			playerWingDy += (state == KeyState::KEYBOARD_PRESSED ? MOVE_SPEED : -MOVE_SPEED);
